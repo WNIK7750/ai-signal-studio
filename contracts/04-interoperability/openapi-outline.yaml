@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: AI Signal Studio API
+  version: 0.1.0
+paths:
+  /api/agent-conversations/current:
+    get:
+      operationId: getCurrentAgentConversation
+      summary: Read or create the active local Agent conversation
+      responses:
+        '200':
+          description: Conversation with persisted messages
+  /api/agent-runs:
+    post:
+      operationId: runWorkspaceAgentTurn
+      summary: Persist and execute an idempotent Agent turn
+      responses:
+        '200':
+          description: Persisted Agent response and capability calls
+  /api/collection-runs:
+    post:
+      operationId: startCollectionRun
+      summary: Start a collection run
+      responses:
+        '201':
+          description: Run completed
+  /api/timeline:
+    get:
+      operationId: queryIntelligenceTimeline
+      summary: Query intelligence timeline
+      responses:
+        '200':
+          description: Timeline page
+  /api/review-batches/{batch_id}/decisions:
+    post:
+      operationId: submitReviewDecisions
+      parameters:
+        - in: path
+          name: batch_id
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Decisions applied
+  /api/review-batches/current:
+    get:
+      operationId: getCurrentReviewBatch
+      responses:
+        '200':
+          description: Current or most recently completed review batch
+  /api/cards:
+    get:
+      operationId: listCards
+      summary: List cards by month, date, priority, source, or topic
+      responses:
+        '200':
+          description: Filtered card page
+  /api/cards/generate:
+    post:
+      operationId: generateCards
+      responses:
+        '201':
+          description: Idempotent generation result
+  /api/cards/{card_id}:
+    get:
+      operationId: getCard
+      responses:
+        '200':
+          description: Card detail with source link
+  /api/transcription/sessions:
+    post:
+      operationId: startTranscriptionSession
+      responses:
+        '201':
+          description: Session created
+# WebSocket /ws/transcription/{session_id} is documented separately by
+# contracts/03-realtime-transcription/realtime-transcription-protocol.schema.json.

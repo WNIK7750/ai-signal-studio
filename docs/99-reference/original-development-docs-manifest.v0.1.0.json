@@ -1,0 +1,293 @@
+{
+  "package": "ai-signal-studio-development-docs",
+  "version": "0.1.0",
+  "generated_date": "2026-08-03",
+  "file_count_excluding_manifest": 57,
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 3355,
+      "sha256": "725324a0403a377632227dfe47f3f341ba39c4db58c89292863da8521a2cb80c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3216,
+      "sha256": "60388c001dc18f80e4bcaf675dcd2e77909c75c7e04eccc12349b97e297ba2b5"
+    },
+    {
+      "path": "agent-packs/ai-editor/agent.yaml",
+      "bytes": 506,
+      "sha256": "1093ac373bb9d208742c6b93f0d9d1bf3809b4bf4f6273568dc510638e206d72"
+    },
+    {
+      "path": "agent-packs/ai-editor/behavior.md",
+      "bytes": 469,
+      "sha256": "3f2fb9bf3bb63b9f4a205d8b315cd5b6a81fc197363a5fb4dff984256d72131f"
+    },
+    {
+      "path": "agent-packs/ai-editor/capabilities.yaml",
+      "bytes": 512,
+      "sha256": "51f77e8681681022d63e08de91ccb4c9df57e44b86808216bd7741e87fd1c8f6"
+    },
+    {
+      "path": "agent-packs/ai-editor/knowledge/topics.md",
+      "bytes": 96,
+      "sha256": "e51456b74419715e268bb585bcf492686f082111fb04dff64ab33b95d7e0fd72"
+    },
+    {
+      "path": "agent-packs/ai-editor/knowledge/trusted-sources.yaml",
+      "bytes": 272,
+      "sha256": "dd9d5b5d6c3a237de7b8406985e6ade1501925f3dcca7dbd9c3444007de55e5f"
+    },
+    {
+      "path": "agent-packs/ai-editor/memory/decisions.md",
+      "bytes": 166,
+      "sha256": "428f0500daf9b571c5c1ee283e0a097ead2ced99bdc863081d6171d284650892"
+    },
+    {
+      "path": "agent-packs/ai-editor/memory/facts.md",
+      "bytes": 98,
+      "sha256": "44fe76c091f9e4341d3e08c5cc215d5d9d32bf512e55d41b7938174d5f79c09d"
+    },
+    {
+      "path": "agent-packs/ai-editor/memory/observations.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agent-packs/ai-editor/memory/preferences.md",
+      "bytes": 167,
+      "sha256": "9e5cd58108c0a80581f3802e722d71ccdd0ef06300fc24590d8f755b718a30b9"
+    },
+    {
+      "path": "agent-packs/ai-editor/memory/profile.md",
+      "bytes": 102,
+      "sha256": "5003436c45a56bb50d936493584e4232251bdec06e725edebcf61539414064ca"
+    },
+    {
+      "path": "agent-packs/ai-editor/poster-style.md",
+      "bytes": 253,
+      "sha256": "a44dde35aedeef0765598c78ca5c2b662f8ff74176db77723f4584785871bf98"
+    },
+    {
+      "path": "agent-packs/ai-editor/scoring-policy.yaml",
+      "bytes": 226,
+      "sha256": "ecc5c41057238f22ad9ffc897452cdacae95cbb976ce5543f325761af17c0095"
+    },
+    {
+      "path": "agent-packs/ai-editor/source-policy.yaml",
+      "bytes": 240,
+      "sha256": "901ddd0188ea5ec7d78b3be65cd0f41f186e80551ae5e0dfd5705ec31a282399"
+    },
+    {
+      "path": "agent-packs/ai-editor/system.md",
+      "bytes": 496,
+      "sha256": "69f671dc4855437f3354333c3bc476d7953596efdd5a04e55f60fe43f1604c05"
+    },
+    {
+      "path": "contracts/a2a-agent-card.example.json",
+      "bytes": 1117,
+      "sha256": "924b969e6f506df2f57dee06a91b7489fda0bc6199af089ec9862dc6a9df2166"
+    },
+    {
+      "path": "contracts/agent-pack.schema.json",
+      "bytes": 1353,
+      "sha256": "879b8188eb1661967ecc2581e01a4c4488a0556bb741071026c9fc4946a50703"
+    },
+    {
+      "path": "contracts/capability-catalog.yaml",
+      "bytes": 2467,
+      "sha256": "a45f24842bb91029b009029a9ffdfd26e611013fc1d6ed6f1cfd408a846bda82"
+    },
+    {
+      "path": "contracts/capability-manifest.schema.json",
+      "bytes": 1983,
+      "sha256": "c4d8c20274cebeb2a654d87fe904fa32c24194f890fa2e4de2c45fee2000f24b"
+    },
+    {
+      "path": "contracts/mcp-catalog.example.json",
+      "bytes": 840,
+      "sha256": "27e8973daf3a17cbdeb20f9d8ec002d25e9618ba56c19d76ddf28cb00c20f141"
+    },
+    {
+      "path": "contracts/openapi-outline.yaml",
+      "bytes": 1152,
+      "sha256": "488f705296ac4bb99e0676d80a76125163b9882339cdec41e25782df904a34a8"
+    },
+    {
+      "path": "contracts/realtime-transcription-protocol.schema.json",
+      "bytes": 3606,
+      "sha256": "3943d9d04c31d1a781d85ccecf4d70408e654c3d574f40b851ca95c4f7f5d5fd"
+    },
+    {
+      "path": "docs/00-project-charter.md",
+      "bytes": 3061,
+      "sha256": "ef0a9810fb7b0c45e049ba691ca22c224d171cced6b0f9d66a5b44061c7acd09"
+    },
+    {
+      "path": "docs/01-product-and-user-flows.md",
+      "bytes": 3311,
+      "sha256": "120b420dd437ddf227397f71ab9cb9d84a972920663cca4d3ca21e3cad9949a8"
+    },
+    {
+      "path": "docs/02-system-architecture.md",
+      "bytes": 3220,
+      "sha256": "cff2ea82d1167faabfb5a501ac04590074e7dd375333c7d93800912a3e01c344"
+    },
+    {
+      "path": "docs/03-module-boundaries.md",
+      "bytes": 2622,
+      "sha256": "02b7dc824721ed0471677ab3c45eabb3ac8b23a332b64b5ab634dd60cec981f0"
+    },
+    {
+      "path": "docs/04-capability-contract.md",
+      "bytes": 2963,
+      "sha256": "1970a87df77f9f1ae37ef92354f761dc1748db53d9aaf8704317132a938aca79"
+    },
+    {
+      "path": "docs/05-agent-runtime-and-switches.md",
+      "bytes": 2258,
+      "sha256": "c7cc6e489399d899a5421fc7136a2d2090e38d94b055fd8405a7fa1716675540"
+    },
+    {
+      "path": "docs/06-langgraph-workflows.md",
+      "bytes": 2701,
+      "sha256": "f9b1aedbeb31ee5e71377a62dac077e6b8d4f2605326cc5a3fdfd720fb185f95"
+    },
+    {
+      "path": "docs/07-agent-pack-and-memory.md",
+      "bytes": 2499,
+      "sha256": "63f81f68a23414520494b07d1a6e32aa333b09ebeac6a74cc329ffaf8601243a"
+    },
+    {
+      "path": "docs/08-data-artifacts-and-images.md",
+      "bytes": 1839,
+      "sha256": "7e69674bffe872103ecbee608794d97c1bd71f5769b6a0918131e44591dfdbbd"
+    },
+    {
+      "path": "docs/09-realtime-speech-to-text.md",
+      "bytes": 5846,
+      "sha256": "a3dd7f5b2610035ac5851fd0bb1b0f76f5981a5455029c80179b44033ca44f1d"
+    },
+    {
+      "path": "docs/10-rest-a2a-and-mcp.md",
+      "bytes": 2150,
+      "sha256": "a21dda7b8a351f69fcab3d971cd4cec83192a2ce56495c701d4f601261d249a8"
+    },
+    {
+      "path": "docs/11-frontend-architecture.md",
+      "bytes": 1875,
+      "sha256": "23fae399c19d98e07c20999325d205ff43ab7638cfc669081f50317d24be7a96"
+    },
+    {
+      "path": "docs/12-simple-tdd-and-testing.md",
+      "bytes": 2154,
+      "sha256": "24c76c6a498d9656e4ec4f1609dbb9fcf9e05c380080ef4994027b04237026d1"
+    },
+    {
+      "path": "docs/13-observability-and-debugging.md",
+      "bytes": 1632,
+      "sha256": "854f40270bfdee728838590791c3e2c8cee38b124c594a903857ca936873c47a"
+    },
+    {
+      "path": "docs/14-security-and-approval.md",
+      "bytes": 1396,
+      "sha256": "f1baef8822df8452e1626962ab4114a1b14e76c414268967bd3ab1d12df0175a"
+    },
+    {
+      "path": "docs/15-development-roadmap.md",
+      "bytes": 3948,
+      "sha256": "510164e0d686cbbe48eb4205769c1a9d8efb7ccef256120fcdb37af00c3e6785"
+    },
+    {
+      "path": "docs/16-repository-layout.md",
+      "bytes": 1786,
+      "sha256": "b840553c25cfb5ee13475d9cd4953f7f58d2bc688b6b419e6ebfd78d7caee406"
+    },
+    {
+      "path": "docs/17-practice-sources-and-adaptations.md",
+      "bytes": 3190,
+      "sha256": "e6ac1ff962fde61b6b0e5df41f61ac060b27cbac2c5febd44c4ceaa983b78253"
+    },
+    {
+      "path": "docs/adr/0001-modular-monolith.md",
+      "bytes": 498,
+      "sha256": "58a7041949348b4c80e7325585bdf90166f044f91a72133cc1591c51176d2798"
+    },
+    {
+      "path": "docs/adr/0002-capability-core.md",
+      "bytes": 403,
+      "sha256": "81fe4183957e98bf202a0d43b6837accd9e8fdfe0046ccb3f7f1c19d34327a75"
+    },
+    {
+      "path": "docs/adr/0003-agent-pack-source-of-truth.md",
+      "bytes": 437,
+      "sha256": "ad6cdd646a85bc540099c2f3467b21aad893847463c5207c3d3a65b539f3d26b"
+    },
+    {
+      "path": "docs/adr/0004-vendor-realtime-stt.md",
+      "bytes": 511,
+      "sha256": "33752f51b090fd25fd9ace332df7b3956ec75274c66579e0db4e222a13b3b8b3"
+    },
+    {
+      "path": "docs/adr/0005-product-first-simple-tdd.md",
+      "bytes": 437,
+      "sha256": "2fac084f5e512d2acf0bc4aa7f8ecc15882a41aad5dcc7399a24e96e089a2f51"
+    },
+    {
+      "path": "graph-specs/collection-graph.yaml",
+      "bytes": 670,
+      "sha256": "06903c90cde1acb31bbf561ac81f2f25a7962857c2b1ba5c06df00084dc6d8bb"
+    },
+    {
+      "path": "graph-specs/poster-graph.yaml",
+      "bytes": 571,
+      "sha256": "78b0b7221c0835299485e0b9cb2bb1df0159c9e787863ce28ed88da3cc2be810"
+    },
+    {
+      "path": "graph-specs/review-graph.yaml",
+      "bytes": 474,
+      "sha256": "eddacf70dee6efa407211ce83b7d41731da6a8dce406096b331c04af013b1a87"
+    },
+    {
+      "path": "prompts/module-1-coding-agent-prompt.md",
+      "bytes": 1654,
+      "sha256": "eed0ed2da2f2694ebfec5890277e9efa753dc9500840fcf0bce7d5352e5a902d"
+    },
+    {
+      "path": "prompts/module-3-realtime-stt-coding-agent-prompt.md",
+      "bytes": 1220,
+      "sha256": "dab66b80bc529897d202981ba4a5c46c8fcccbfd6130ac9e74650cadf0adbb33"
+    },
+    {
+      "path": "tests/README.md",
+      "bytes": 889,
+      "sha256": "ae6d12ba75d16fa6906a317c53297792df19a5c82d3993b17ebec9fbe99c159d"
+    },
+    {
+      "path": "vendor_tools/README.md",
+      "bytes": 499,
+      "sha256": "bc4f18d74f8167cfa2f0230a3f4da82d397f67919adbbf099567881bdead55df"
+    },
+    {
+      "path": "vendor_tools/speech_to_text/README.md",
+      "bytes": 447,
+      "sha256": "fc16d91df08e1adcdc1a30a918e8a5a15fa21eeea745b0861e51535199c3e4ca"
+    },
+    {
+      "path": "vendor_tools/speech_to_text/whisperlive/INTEGRATION.md",
+      "bytes": 1077,
+      "sha256": "3776cc6a61a462a521cb9dbb761a06ba7f29169ea134f5a0a0b33f153763c4ae"
+    },
+    {
+      "path": "vendor_tools/speech_to_text/whisperlive/LICENSE-NOTICE.md",
+      "bytes": 301,
+      "sha256": "0e04bb3908f80ea4c017737aca8b83b4be6f0bcbb0a0d7f1d7c1ca23ef37ea0f"
+    },
+    {
+      "path": "vendor_tools/speech_to_text/whisperlive/UPSTREAM.md",
+      "bytes": 543,
+      "sha256": "9b7e2edbf0a2d2e32336fdc2d9e880ef7fadeeec8938220ff8bd14e5adc63447"
+    }
+  ]
+}

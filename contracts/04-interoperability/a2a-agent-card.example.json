@@ -1,0 +1,48 @@
+{
+  "protocolVersion": "1.0",
+  "name": "AI Signal Studio Agent",
+  "description": "Collects, organizes and prepares AI intelligence and editable poster drafts.",
+  "url": "https://example.invalid/a2a",
+  "version": "0.1.0",
+  "capabilities": {
+    "streaming": true
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "collect_ai_intelligence",
+      "name": "Collect AI Intelligence",
+      "description": "Collect and analyze AI information for a time range.",
+      "tags": [
+        "ai",
+        "collection",
+        "news"
+      ]
+    },
+    {
+      "id": "query_ai_timeline",
+      "name": "Query AI Timeline",
+      "description": "Query approved or pending AI intelligence.",
+      "tags": [
+        "timeline",
+        "search"
+      ]
+    },
+    {
+      "id": "prepare_poster_drafts",
+      "name": "Prepare Poster Drafts",
+      "description": "Prepare editable poster drafts after required approvals.",
+      "tags": [
+        "poster",
+        "content"
+      ]
+    }
+  ]
+}

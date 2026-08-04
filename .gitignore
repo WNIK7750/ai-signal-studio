@@ -1,0 +1,73 @@
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+config/*.local.json
+config/**/*.local.json
+*.pem
+*.p12
+*.pfx
+
+# Runtime data and logs
+data/
+logs/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+
+# Python environments, caches and packages
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+
+# Node.js, package-manager and Next.js artifacts
+node_modules/
+**/node_modules/
+.tools/
+.corepack/
+.corepack-cache/
+.pnpm-store/
+.next/
+**/.next/
+.next-e2e/
+**/.next-e2e/
+.next-verify/
+**/.next-verify/
+out/
+*.tsbuildinfo
+.eslintcache
+
+# Test and coverage outputs
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.orig

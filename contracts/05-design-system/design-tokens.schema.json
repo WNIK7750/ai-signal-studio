@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-signal.local/schemas/design-theme-v1.json",
+  "title": "AI Signal Studio Design Theme v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "mode",
+    "tokens"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "mode": {
+      "enum": [
+        "light",
+        "dark",
+        "high-contrast"
+      ]
+    },
+    "tokens": {
+      "$ref": "#/$defs/tokens"
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$"
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "color",
+        "typography",
+        "layout",
+        "shape",
+        "icon",
+        "motion"
+      ],
+      "properties": {
+        "color": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "canvas",
+            "surface",
+            "surfaceSubtle",
+            "surfaceElevated",
+            "text",
+            "textSecondary",
+            "textMuted",
+            "border",
+            "borderStrong",
+            "accent",
+            "accentText",
+            "info",
+            "success",
+            "warning",
+            "danger",
+            "focus"
+          ],
+          "properties": {
+            "canvas": {"$ref": "#/$defs/color"},
+            "surface": {"$ref": "#/$defs/color"},
+            "surfaceSubtle": {"$ref": "#/$defs/color"},
+            "surfaceElevated": {"$ref": "#/$defs/color"},
+            "text": {"$ref": "#/$defs/color"},
+            "textSecondary": {"$ref": "#/$defs/color"},
+            "textMuted": {"$ref": "#/$defs/color"},
+            "border": {"$ref": "#/$defs/color"},
+            "borderStrong": {"$ref": "#/$defs/color"},
+            "accent": {"$ref": "#/$defs/color"},
+            "accentText": {"$ref": "#/$defs/color"},
+            "info": {"$ref": "#/$defs/color"},
+            "success": {"$ref": "#/$defs/color"},
+            "warning": {"$ref": "#/$defs/color"},
+            "danger": {"$ref": "#/$defs/color"},
+            "focus": {"$ref": "#/$defs/color"}
+          }
+        },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fontFamilySans",
+            "fontFamilyMono",
+            "fontSizeBase",
+            "lineHeightBase"
+          ],
+          "properties": {
+            "fontFamilySans": {"type": "string", "minLength": 1},
+            "fontFamilyMono": {"type": "string", "minLength": 1},
+            "fontSizeBase": {"type": "integer", "minimum": 12, "maximum": 18},
+            "lineHeightBase": {"type": "number", "minimum": 1.3, "maximum": 1.8}
+          }
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "density",
+            "navWidth",
+            "inspectorWidth",
+            "contentMaxWidth"
+          ],
+          "properties": {
+            "density": {"type": "number", "minimum": 0.85, "maximum": 1.15},
+            "navWidth": {"type": "integer", "minimum": 208, "maximum": 320},
+            "inspectorWidth": {"type": "integer", "minimum": 280, "maximum": 480},
+            "contentMaxWidth": {"type": "integer", "minimum": 720, "maximum": 1440}
+          }
+        },
+        "shape": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "radius",
+            "borderWidth"
+          ],
+          "properties": {
+            "radius": {"type": "integer", "minimum": 0, "maximum": 20},
+            "borderWidth": {"type": "integer", "minimum": 1, "maximum": 2}
+          }
+        },
+        "icon": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "size",
+            "stroke"
+          ],
+          "properties": {
+            "size": {"type": "integer", "minimum": 16, "maximum": 24},
+            "stroke": {"type": "number", "minimum": 1.25, "maximum": 2.25}
+          }
+        },
+        "motion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "durationFast",
+            "durationNormal"
+          ],
+          "properties": {
+            "durationFast": {"type": "integer", "minimum": 0, "maximum": 300},
+            "durationNormal": {"type": "integer", "minimum": 0, "maximum": 500}
+          }
+        }
+      }
+    }
+  }
+}

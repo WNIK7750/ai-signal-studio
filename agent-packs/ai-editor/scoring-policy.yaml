@@ -1,0 +1,11 @@
+weights:
+  source_authority: 0.25
+  novelty: 0.20
+  technical_impact: 0.20
+  ecosystem_impact: 0.15
+  timeliness: 0.10
+  evidence_quality: 0.10
+thresholds:
+  high_priority: 80
+  normal_priority: 55
+  hide_by_default_below: 35

@@ -1,0 +1,97 @@
+version: 1
+capabilities:
+  - id: collection.run.start
+    version: 1.0.0
+    title: Start collection run
+    input_schema: collection-run-start-input-v1
+    output_schema: collection-run-v1
+    side_effect: external
+    risk_level: low
+    approval: never
+    required_scopes: [collection:write]
+    dependencies: []
+    interfaces:
+      rest: true
+      langchain_tool: true
+      mcp_tool: true
+      a2a_skill: true
+
+  - id: intelligence.timeline.query
+    version: 1.0.0
+    title: Query intelligence timeline
+    input_schema: timeline-query-input-v1
+    output_schema: timeline-page-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: []
+    interfaces:
+      rest: true
+      langchain_tool: true
+      mcp_tool: true
+      a2a_skill: false
+
+  - id: review.batch.submit
+    version: 1.0.0
+    title: Submit review decisions
+    input_schema: review-submit-input-v1
+    output_schema: review-submit-result-v1
+    side_effect: write
+    risk_level: medium
+    approval: policy
+    required_scopes: [review:write]
+    dependencies: []
+    interfaces:
+      rest: true
+      langchain_tool: true
+      mcp_tool: true
+      a2a_skill: false
+
+  - id: poster.draft.generate
+    version: 1.0.0
+    title: Generate browseable information cards
+    input_schema: card-generate-input-v1
+    output_schema: card-generate-result-v1
+    side_effect: write
+    risk_level: low
+    approval: never
+    required_scopes: [cards:write]
+    dependencies: [review.batch.submit]
+    interfaces:
+      rest: true
+      langchain_tool: true
+      mcp_tool: false
+      a2a_skill: false
+
+  - id: poster.card.render
+    version: 1.0.0
+    title: Render poster card
+    input_schema: poster-render-input-v1
+    output_schema: rendered-artifact-v1
+    side_effect: write
+    risk_level: medium
+    approval: policy
+    required_scopes: [poster:render]
+    dependencies: []
+    interfaces:
+      rest: true
+      langchain_tool: true
+      mcp_tool: true
+      a2a_skill: false
+
+  - id: transcription.session.start
+    version: 1.0.0
+    title: Start realtime transcription session
+    input_schema: transcription-session-start-v1
+    output_schema: transcription-session-v1
+    side_effect: external
+    risk_level: low
+    approval: never
+    required_scopes: [transcription:use]
+    dependencies: []
+    interfaces:
+      rest: true
+      langchain_tool: false
+      mcp_tool: false
+      a2a_skill: false

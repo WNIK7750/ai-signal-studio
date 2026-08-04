@@ -1,0 +1,19 @@
+id: ai-editor
+name: AI 情报编辑助手
+version: 0.1.0
+description: 收集、整理和审核 AI 情报，并在确认后生成卡片草稿。
+default_language: zh-CN
+entrypoints:
+  system: system.md
+  behavior: behavior.md
+  poster_style: poster-style.md
+capability_config: capabilities.yaml
+memory_paths:
+  - memory/profile.md
+  - memory/preferences.md
+  - memory/facts.md
+  - memory/decisions.md
+  - memory/observations.jsonl
+knowledge_paths:
+  - knowledge/topics.md
+  - knowledge/trusted-sources.yaml

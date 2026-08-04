@@ -1,0 +1,198 @@
+[
+  {
+    "id": "signal-light",
+    "name": "Signal Light",
+    "mode": "light",
+    "tokens": {
+      "color": {
+        "canvas": "#F7F7F5",
+        "surface": "#FFFFFF",
+        "surfaceSubtle": "#F0F1EF",
+        "surfaceElevated": "#FFFFFF",
+        "text": "#1F2328",
+        "textSecondary": "#5B616A",
+        "textMuted": "#7A818B",
+        "border": "#D9DCE1",
+        "borderStrong": "#B8BEC7",
+        "accent": "#2563EB",
+        "accentText": "#FFFFFF",
+        "info": "#2563EB",
+        "success": "#18864B",
+        "warning": "#A15C00",
+        "danger": "#C9362B",
+        "focus": "#4F7EF7"
+      },
+      "typography": {
+        "fontFamilySans": "Inter, ui-sans-serif, system-ui, sans-serif",
+        "fontFamilyMono": "JetBrains Mono, ui-monospace, monospace",
+        "fontSizeBase": 14,
+        "lineHeightBase": 1.5
+      },
+      "layout": {
+        "density": 1,
+        "navWidth": 248,
+        "inspectorWidth": 360,
+        "contentMaxWidth": 1200
+      },
+      "shape": {
+        "radius": 10,
+        "borderWidth": 1
+      },
+      "icon": {
+        "size": 18,
+        "stroke": 1.75
+      },
+      "motion": {
+        "durationFast": 120,
+        "durationNormal": 180
+      }
+    }
+  },
+  {
+    "id": "midnight",
+    "name": "Midnight",
+    "mode": "dark",
+    "tokens": {
+      "color": {
+        "canvas": "#171918",
+        "surface": "#1F2221",
+        "surfaceSubtle": "#272A29",
+        "surfaceElevated": "#2C302E",
+        "text": "#F3F5F4",
+        "textSecondary": "#C0C6C3",
+        "textMuted": "#8F9893",
+        "border": "#383D3A",
+        "borderStrong": "#505853",
+        "accent": "#7AA2F7",
+        "accentText": "#111315",
+        "info": "#7AA2F7",
+        "success": "#5BC48A",
+        "warning": "#E6A34A",
+        "danger": "#F07A72",
+        "focus": "#9AB7FF"
+      },
+      "typography": {
+        "fontFamilySans": "Inter, ui-sans-serif, system-ui, sans-serif",
+        "fontFamilyMono": "JetBrains Mono, ui-monospace, monospace",
+        "fontSizeBase": 14,
+        "lineHeightBase": 1.5
+      },
+      "layout": {
+        "density": 1,
+        "navWidth": 248,
+        "inspectorWidth": 360,
+        "contentMaxWidth": 1200
+      },
+      "shape": {
+        "radius": 10,
+        "borderWidth": 1
+      },
+      "icon": {
+        "size": 18,
+        "stroke": 1.75
+      },
+      "motion": {
+        "durationFast": 120,
+        "durationNormal": 180
+      }
+    }
+  },
+  {
+    "id": "paper",
+    "name": "Paper",
+    "mode": "light",
+    "tokens": {
+      "color": {
+        "canvas": "#F4F0E7",
+        "surface": "#FBF8F1",
+        "surfaceSubtle": "#ECE5D7",
+        "surfaceElevated": "#FFFDF8",
+        "text": "#2C2923",
+        "textSecondary": "#655F54",
+        "textMuted": "#8A8173",
+        "border": "#D8CFBF",
+        "borderStrong": "#B8AC99",
+        "accent": "#556B4F",
+        "accentText": "#FFFFFF",
+        "info": "#426E91",
+        "success": "#557A54",
+        "warning": "#9A672D",
+        "danger": "#A64B42",
+        "focus": "#6C8264"
+      },
+      "typography": {
+        "fontFamilySans": "Source Sans 3, ui-sans-serif, system-ui, sans-serif",
+        "fontFamilyMono": "JetBrains Mono, ui-monospace, monospace",
+        "fontSizeBase": 15,
+        "lineHeightBase": 1.55
+      },
+      "layout": {
+        "density": 1.05,
+        "navWidth": 248,
+        "inspectorWidth": 360,
+        "contentMaxWidth": 1120
+      },
+      "shape": {
+        "radius": 8,
+        "borderWidth": 1
+      },
+      "icon": {
+        "size": 18,
+        "stroke": 1.75
+      },
+      "motion": {
+        "durationFast": 120,
+        "durationNormal": 180
+      }
+    }
+  },
+  {
+    "id": "forest",
+    "name": "Forest",
+    "mode": "light",
+    "tokens": {
+      "color": {
+        "canvas": "#000000",
+        "surface": "#0B0B0B",
+        "surfaceSubtle": "#171717",
+        "surfaceElevated": "#111111",
+        "text": "#FFFFFF",
+        "textSecondary": "#E5E5E5",
+        "textMuted": "#BDBDBD",
+        "border": "#737373",
+        "borderStrong": "#FFFFFF",
+        "accent": "#FFD400",
+        "accentText": "#000000",
+        "info": "#66B2FF",
+        "success": "#58D68D",
+        "warning": "#FFD400",
+        "danger": "#FF6B6B",
+        "focus": "#00E5FF"
+      },
+      "typography": {
+        "fontFamilySans": "Inter, ui-sans-serif, system-ui, sans-serif",
+        "fontFamilyMono": "JetBrains Mono, ui-monospace, monospace",
+        "fontSizeBase": 15,
+        "lineHeightBase": 1.55
+      },
+      "layout": {
+        "density": 1.05,
+        "navWidth": 256,
+        "inspectorWidth": 368,
+        "contentMaxWidth": 1200
+      },
+      "shape": {
+        "radius": 6,
+        "borderWidth": 2
+      },
+      "icon": {
+        "size": 20,
+        "stroke": 2
+      },
+      "motion": {
+        "durationFast": 0,
+        "durationNormal": 0
+      }
+    }
+  }
+]

@@ -1,0 +1,30 @@
+from collections.abc import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from ai_signal_api.config import Settings
+from ai_signal_api.main import create_app
+
+
+class FakeModelChat:
+    def complete(self, model, message: str, image_urls: list[str]) -> str:
+        return f"{model.name}回复：已收到{len(image_urls)}张图片。"
+
+
+@pytest.fixture()
+def client(tmp_path) -> Iterator[TestClient]:
+    database_url = f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
+    app = create_app(
+        settings=Settings(
+            _env_file=None,
+            database_url=database_url,
+            llm_provider="heuristic",
+            model_config_path=tmp_path / "models.local.json",
+            model_secrets_path=tmp_path / "model-secrets.local.json",
+        ),
+        seed_demo_sources=True,
+    )
+    app.state.model_chat = FakeModelChat()
+    with TestClient(app) as test_client:
+        yield test_client

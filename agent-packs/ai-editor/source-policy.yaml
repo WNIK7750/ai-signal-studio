@@ -1,0 +1,10 @@
+source_priority:
+  official_blog: 100
+  official_repository: 95
+  research_paper: 90
+  established_technical_media: 75
+  community_post: 40
+rules:
+  prefer_primary_source: true
+  keep_secondary_evidence: true
+  mark_unverified_claims: true

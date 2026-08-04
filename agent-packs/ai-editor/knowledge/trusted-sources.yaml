@@ -1,0 +1,10 @@
+sources:
+  - id: langchain-docs
+    type: official_docs
+    base_url: https://docs.langchain.com/
+  - id: github-releases
+    type: official_repository
+    base_url: https://github.com/
+  - id: huggingface
+    type: official_platform
+    base_url: https://huggingface.co/

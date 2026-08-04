@@ -1,0 +1,21 @@
+id: poster_graph
+version: 1.0.0
+input: PosterGraphInputV1
+state: PosterStateV1
+nodes:
+  - load_approved_items
+  - confirm_draft_generation
+  - generate_drafts
+  - save_drafts
+  - confirm_render
+  - render_cards
+  - complete
+edges:
+  - [load_approved_items, confirm_draft_generation]
+  - [confirm_draft_generation, generate_drafts]
+  - [generate_drafts, save_drafts]
+  - [save_drafts, confirm_render]
+  - [confirm_render, render_cards]
+  - [render_cards, complete]
+side_effect_nodes: [save_drafts, render_cards]
+interrupt_nodes: [confirm_draft_generation, confirm_render]

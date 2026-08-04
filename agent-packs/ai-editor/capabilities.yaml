@@ -1,0 +1,24 @@
+capabilities:
+  collection.run.start:
+    enabled: true
+    approval: never
+    limits:
+      max_sources_per_run: 20
+  intelligence.timeline.query:
+    enabled: true
+    approval: never
+  review.batch.submit:
+    enabled: true
+    approval: policy
+    policy:
+      require_when_reject_count_gte: 20
+  poster.draft.generate:
+    enabled: true
+    approval: required
+    limits:
+      max_items_per_call: 10
+  poster.card.render:
+    enabled: true
+    approval: required
+  memory.pack.import:
+    enabled: false

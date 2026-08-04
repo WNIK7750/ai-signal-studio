@@ -1,0 +1,25 @@
+id: collection_graph
+version: 1.0.0
+input: CollectionGraphInputV1
+state: CollectionStateV1
+nodes:
+  - resolve_request
+  - load_sources
+  - dispatch_collectors
+  - normalize_items
+  - deterministic_dedup
+  - persist_items
+  - analyze_items
+  - build_review_batch
+  - complete
+edges:
+  - [resolve_request, load_sources]
+  - [load_sources, dispatch_collectors]
+  - [dispatch_collectors, normalize_items]
+  - [normalize_items, deterministic_dedup]
+  - [deterministic_dedup, persist_items]
+  - [persist_items, analyze_items]
+  - [analyze_items, build_review_batch]
+  - [build_review_batch, complete]
+side_effect_nodes: [persist_items, build_review_batch]
+interrupt_nodes: []

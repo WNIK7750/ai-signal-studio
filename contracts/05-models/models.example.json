@@ -1,0 +1,30 @@
+[
+  {
+    "id": "model_local",
+    "name": "本地规则模型",
+    "provider": "heuristic",
+    "provider_id": "provider_local",
+    "provider_name": "内置",
+    "model_id": "local-rules",
+    "base_url": "local://heuristic",
+    "has_api_key": false,
+    "supports_vision": false,
+    "output_token_limit": null,
+    "enabled": true,
+    "is_default": true
+  },
+  {
+    "id": "model_vision",
+    "name": "视觉分析模型",
+    "provider": "openai_compatible",
+    "provider_id": "provider_example",
+    "provider_name": "示例提供商",
+    "model_id": "vision-model-v1",
+    "base_url": "https://api.example.com/v1",
+    "has_api_key": true,
+    "supports_vision": true,
+    "output_token_limit": 16000,
+    "enabled": true,
+    "is_default": false
+  }
+]

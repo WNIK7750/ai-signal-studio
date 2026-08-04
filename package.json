@@ -1,0 +1,17 @@
+{
+  "name": "ai-signal-studio",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=20.19 <25",
+    "pnpm": "11.9.x"
+  },
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "build:web": "pnpm --dir apps/web build",
+    "lint:web": "pnpm --dir apps/web lint",
+    "test:web": "pnpm --dir apps/web test",
+    "test:e2e": "pnpm --dir apps/web test:e2e"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "server": {
+    "name": "ai-signal-studio",
+    "version": "0.1.0"
+  },
+  "resources": [
+    {
+      "uri": "app://architecture",
+      "name": "Architecture"
+    },
+    {
+      "uri": "app://capabilities/catalog",
+      "name": "Capability Catalog"
+    },
+    {
+      "uriTemplate": "app://agent-packs/{id}",
+      "name": "Agent Pack"
+    },
+    {
+      "uriTemplate": "app://runs/{id}",
+      "name": "Run Details"
+    }
+  ],
+  "tools": [
+    {
+      "name": "collection.run.start",
+      "capability": "collection.run.start"
+    },
+    {
+      "name": "intelligence.timeline.query",
+      "capability": "intelligence.timeline.query"
+    },
+    {
+      "name": "review.batch.submit",
+      "capability": "review.batch.submit"
+    },
+    {
+      "name": "poster.draft.generate",
+      "capability": "poster.draft.generate"
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-signal.local/schemas/realtime-transcription-message-v1.json",
+  "title": "Realtime Transcription Message v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/start"
+    },
+    {
+      "$ref": "#/$defs/control"
+    },
+    {
+      "$ref": "#/$defs/transcript"
+    },
+    {
+      "$ref": "#/$defs/warning"
+    },
+    {
+      "$ref": "#/$defs/error"
+    },
+    {
+      "$ref": "#/$defs/closed"
+    }
+  ],
+  "$defs": {
+    "start": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "language",
+        "format",
+        "sample_rate"
+      ],
+      "properties": {
+        "type": {
+          "const": "start"
+        },
+        "language": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "webm_opus",
+            "pcm_s16le"
+          ]
+        },
+        "sample_rate": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 96000
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "pause",
+            "resume",
+            "stop"
+          ]
+        }
+      }
+    },
+    "transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "session_id",
+        "segment_id",
+        "revision",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "transcript.partial",
+            "transcript.final"
+          ]
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "segment_id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "text": {
+          "type": "string"
+        },
+        "start_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "end_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "type": {
+          "const": "session.warning"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "code",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "type": {
+          "const": "session.error"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "closed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "session_id",
+        "final_text"
+      ],
+      "properties": {
+        "type": {
+          "const": "session.closed"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "final_text": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

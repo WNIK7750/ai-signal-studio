@@ -1,0 +1,19 @@
+id: review_graph
+version: 1.0.0
+input: ReviewGraphInputV1
+state: ReviewStateV1
+nodes:
+  - load_batch
+  - prepare_review
+  - wait_for_decisions
+  - validate_decisions
+  - apply_decisions
+  - complete
+edges:
+  - [load_batch, prepare_review]
+  - [prepare_review, wait_for_decisions]
+  - [wait_for_decisions, validate_decisions]
+  - [validate_decisions, apply_decisions]
+  - [apply_decisions, complete]
+side_effect_nodes: [apply_decisions]
+interrupt_nodes: [wait_for_decisions]

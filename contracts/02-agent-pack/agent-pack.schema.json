@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-signal.local/schemas/agent-pack-v1.json",
+  "title": "Agent Pack v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "entrypoints",
+    "capability_config"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "default_language": {
+      "type": "string"
+    },
+    "entrypoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "behavior"
+      ],
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "behavior": {
+          "type": "string"
+        },
+        "poster_style": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "capability_config": {
+      "type": "string"
+    },
+    "memory_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "knowledge_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
