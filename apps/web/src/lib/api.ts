@@ -13,7 +13,11 @@ export function transcriptionWebSocketUrl(
   )}?token=${encodeURIComponent(token)}`;
 }
 
-export type SourceKind = "demo" | "rss" | "github_releases";
+export type SourceKind =
+  | "demo"
+  | "rss"
+  | "github_releases"
+  | "web_search";
 
 export interface TimelineItem {
   id: string;
@@ -184,7 +188,12 @@ export interface AgentPlanStep {
   step_id: string;
   title: string;
   goal: string;
-  capability_id: string;
+  kind:
+    | "capability"
+    | "domain_agent"
+    | "domain_workflow"
+    | "model_reasoning";
+  capability_id: string | null;
   dependencies: string[];
 }
 export interface AgentPlan {
@@ -196,6 +205,7 @@ export interface AgentPlan {
 export interface AgentResultBlock {
   block_id: string;
   type:
+    | "result_summary"
     | "plan_summary"
     | "signal_preview"
     | "collection_summary"
@@ -206,7 +216,9 @@ export interface AgentResultBlock {
     | "evidence_sources"
     | "artifact_list"
     | "partial_failure"
-    | "navigation_action";
+    | "navigation_action"
+    | "model_response"
+    | (string & {});
   title: string;
   data: Record<string, unknown>;
 }
@@ -240,6 +252,9 @@ export interface AgentTurn {
   status: AgentTurnStatus;
   message: string;
   workflow_version: string;
+  requested_model_id: string | null;
+  effective_model_id: string | null;
+  manifest: Record<string, unknown>;
   plan: AgentPlan | Record<string, never>;
   result: AgentTurnResult | Record<string, never>;
   error: Record<string, unknown> | null;
@@ -291,6 +306,14 @@ export interface ModelConfig {
   output_token_limit: number | null;
   enabled: boolean;
   is_default: boolean;
+  connection_status:
+    | "pending"
+    | "healthy"
+    | "needs_retest"
+    | "error"
+    | "not_applicable";
+  connection_checked_at: string | null;
+  connection_error_code: string | null;
   updated_at: string;
 }
 export interface ProviderConfig {
@@ -648,6 +671,7 @@ export const api = {
       message: string;
       client_message_id: string;
       model_id?: string;
+      artifact_ids?: string[];
     },
   ) {
     return request<AgentTurn>(

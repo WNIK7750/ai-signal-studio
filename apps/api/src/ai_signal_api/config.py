@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     enable_scheduler: bool = True
     disabled_capabilities: list[str] = Field(default_factory=list)
     source_seed_mode: Literal["live", "demo", "none"] = "live"
+    agent_test_mode: bool = False
     agent_checkpoint_path: Path | None = None
     artifact_root: Path = Path("data/artifacts")
     agent_pack_root: Path = Path("data/agent-packs")
@@ -41,6 +42,8 @@ class Settings(BaseSettings):
     model_secrets_path: Path = Path("config/model-secrets.local.json")
 
     search_api_key: SecretStr | None = None
+    search_provider: Literal["brave"] = "brave"
+    search_base_url: str = "https://api.search.brave.com/res/v1"
     github_token: SecretStr | None = None
 
     @property

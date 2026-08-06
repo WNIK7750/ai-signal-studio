@@ -16,6 +16,12 @@ from ai_signal_api.modules.agent_assets.schemas import (
 )
 from ai_signal_api.modules.collection.service import CollectionService
 from ai_signal_api.modules.collection.service import SourceService
+from ai_signal_api.modules.collection.web_discovery import (
+    WebDiscoveryService,
+    WebSearchCollectInput,
+    WebSearchCollectResult,
+)
+from ai_signal_api.integrations.search.brave import BraveWebSearchProvider
 from ai_signal_api.modules.agent.conversation_service import (
     AgentConversationService,
 )
@@ -47,6 +53,8 @@ from ai_signal_api.capabilities.product_schemas import (
     TaskGetInput,
     TaskListResult,
     TaskPatchCapabilityInput,
+    TaskDraftProposalInput,
+    TaskDraftProposalResult,
 )
 from ai_signal_api.modules.intelligence.llm_analyzer import build_analyzer
 from ai_signal_api.modules.intelligence.agent.schemas import (
@@ -60,8 +68,14 @@ from ai_signal_api.modules.intelligence.agent.service import (
     InformationRecommendationService,
 )
 from ai_signal_api.modules.intelligence.timeline import TimelineService
+from ai_signal_api.modules.intelligence.search import (
+    IntelligenceSearchInput,
+    IntelligenceSearchResult,
+    UnifiedIntelligenceSearchService,
+)
 from ai_signal_api.modules.review.service import ReviewService
 from ai_signal_api.modules.tasking.service import TaskingService
+from ai_signal_api.modules.tasking.drafts import TaskDraftService
 from ai_signal_api.schemas import (
     CardGenerateInput,
     CardGenerateResult,
@@ -96,12 +110,28 @@ def build_capability_executor(
         session,
         analyzer=build_analyzer(settings),
     )
+    search_provider = None
+    if (
+        settings.search_api_key is not None
+        and settings.search_api_key.get_secret_value().strip()
+    ):
+        search_provider = BraveWebSearchProvider(
+            settings.search_api_key.get_secret_value().strip(),
+            base_url=settings.search_base_url,
+        )
+    web_discovery = WebDiscoveryService(
+        session,
+        collection,
+        search_provider,
+    )
     timeline = TimelineService(session)
+    intelligence_search = UnifiedIntelligenceSearchService(session)
     recommendation = InformationRecommendationService(timeline)
-    research = ResearchService(timeline)
+    research = ResearchService(timeline, intelligence_search)
     review = ReviewService(session)
     cards = CardService(session, settings.timezone)
     tasking = TaskingService(session, collection)
+    task_drafts = TaskDraftService()
     sources = SourceService(session)
     library = InformationLibraryService(session)
     conversations = AgentConversationService(session)
@@ -131,6 +161,21 @@ def build_capability_executor(
         _context: ExecutionContext,
     ) -> TimelinePage:
         return timeline.query(input_data)
+
+    def search_intelligence(
+        input_data: IntelligenceSearchInput,
+        _context: ExecutionContext,
+    ) -> IntelligenceSearchResult:
+        return intelligence_search.search(input_data)
+
+    def collect_web_search(
+        input_data: WebSearchCollectInput,
+        context: ExecutionContext,
+    ) -> WebSearchCollectResult:
+        return web_discovery.collect(
+            input_data,
+            idempotency_key=context.idempotency_key,
+        )
 
     def recommend_information(
         input_data: InformationRecommendInput,
@@ -254,6 +299,12 @@ def build_capability_executor(
             input_data,
         )
 
+    def propose_task_draft(
+        input_data: TaskDraftProposalInput,
+        _context: ExecutionContext,
+    ) -> TaskDraftProposalResult:
+        return task_drafts.propose(input_data)
+
     def list_runs(
         input_data: RunListInput,
         _context: ExecutionContext,
@@ -354,8 +405,11 @@ def build_capability_executor(
         )
 
     registry.register("collection.run.start", start_collection)
+    registry.register("web.search.collect", collect_web_search)
     registry.register("task.run.start", start_task_run)
+    registry.register("task.draft.propose", propose_task_draft)
     registry.register("intelligence.timeline.query", query_timeline)
+    registry.register("intelligence.search", search_intelligence)
     registry.register("intelligence.recommend", recommend_information)
     for workflow in (
         "research.filter",
@@ -364,7 +418,6 @@ def build_capability_executor(
         "research.compare",
         "research.trend_brief",
         "research.coverage_gap",
-        "collection_then_analyze",
     ):
         registry.register(
             workflow,

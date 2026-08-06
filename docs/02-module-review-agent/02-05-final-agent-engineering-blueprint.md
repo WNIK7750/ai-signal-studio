@@ -850,3 +850,63 @@ Tool 参数、Tool 结果、个人信息或 Secret。
 10. Graph Spec、历史 Markdown、Figma、任务状态和验收证据使用同一版本。
 
 在此之前，文档必须明确标注“目标蓝图”，不能把设计内容写成已经实现。
+
+## 17. 0.6.0 Blueprint Change Proposal 审核记录
+
+审核结论：**接受最小修改**。不新增第二套 Runtime，不改变 N01～N25 主节点，只扩展
+Plan/Context/N16/N18/ResultBlock 契约。
+
+- 观察：语境型追问被 0.5.0 强制规划为工具链，在缺少条目级候选时全部步骤未执行；
+- 修改：新增只读 `model_reasoning`，工具从“每步必选”改为“事实与动作优先、推理可选”；
+- 约束：模型只能使用有界会话与已完成步骤输出，不能虚构工作区 ID、实时事实或工具结果；
+- 连接策略：新建/编辑标记待检测，用户显式检测；疑似 Provider 错误标记需复检，
+  正常 Turn 不预检；
+- 兼容：核心契约保持 OpenAI-compatible 中性，OpenAI 与阿里云等差异继续只放在
+  Provider Compatibility Adapter；
+- 迁移：已完成旧 Turn 只读；未完成 0.5.0 checkpoint 不由 0.6.0 静默恢复；
+- 回退：恢复 0.5.0 Runtime，继续只读显示 0.6.0 Turn，不删除会话或结果；
+- 同步：Graph Spec、历史、本文、状态、契约与测试使用 `workflow_version=0.6.0`；
+  Figma 仍需同一目标文件的明确写入授权。
+
+### 17.1 0.6.0 空证据执行语义修订
+
+审核结论：**接受既有范围内的 Bug 修复**。不增加节点、不增加第二套 Planner，也不让
+模型绕过 Capability 读取业务数据。
+
+- 问题证据：查询返回 0 条触发 N22 失败，导致推荐与趋势被依赖跳过；
+- 最小修改：可验证的覆盖不足使用 `partial` 并继续；真正的 Schema、引用或 Provider
+  错误仍按失败处理；
+- 模型职责：N18 对 Capability 给出的候选完成推荐语义判断和跨条目综合；
+- 调用预算：推荐与趋势共用一次结构化分析，完整研究 Turn 仍保持一次 Planner 加一次
+  研究模型调用；
+- 空证据边界：允许模型解释为什么无法推荐或总结，但不允许产生任何虚构条目、引用或
+  当前事实；
+- Provider 归一化：结构化输出中的重复/无效 ID 被过滤；不足数量只从 Capability
+  已排序的真实候选补齐；趋势引用只落到本轮真实选择。保留模型有效理由并记录修复，
+  不增加模型调用；载荷解析兼容已解析对象、OpenAI `tool_calls.arguments` 与正文 JSON；
+- 回退：恢复 `research.recommend=capability` 和 N22 原判定即可；已保存 Turn 与
+  ResultBlock 保持只读，不删除用户数据。
+
+### 17.2 Blueprint Change Proposal：缺证据时按需联网补充
+
+状态：**用户已明确要求并接受最小修改；按 `workflow_version=0.7.0` 实施。**
+
+- 问题证据：当前只有 RSS 与 GitHub Releases 等 3 个真实来源启用；24 小时窗口可能
+  合法返回 0，扩大到已保存 3 天背景仍不能保证覆盖最新事件；
+- 最小修改：在“精确查询 + 已保存背景补足”仍少于目标数量时，增加一个受控的
+  `web.search.collect` 外部副作用能力和 N17 执行步骤；结果必须先进入 RawItem/Intelligence
+  正常化、去重与引用流程，模型不得直接把搜索摘要当最终事实；
+- 检索：增加 `intelligence.search`，以 `intelligence_id` 为唯一文档，统一覆盖
+  pending、intelligence、archived、cards 阶段；采用 FTS5 BM25、短词子串兜底、
+  RRF 融合与 SimHash 近重复分组；
+- 复杂度：两个 Capability Adapter、一个由本地候选数控制的条件执行和来源审计字段；不引入第二套 Agent、
+  浏览器自治循环、插件市场或分布式队列；
+- 幂等与安全：查询摘要作为幂等键一部分；域名允许/拒绝策略、超时、条数和正文大小
+  有上限；外部内容按不可信输入处理；
+- 迁移：新工作流版本只影响新 Turn，旧 Turn 只读；关闭能力开关即回到当前流程；
+- 回退：移除条件边并禁用 `web.search.collect`，不删除已正常化入库的信息；
+- Provider：首个 Adapter 为 Brave Search；核心输入输出不含厂商字段，可继续新增
+  其他结构化 Search Provider。没有 API 密钥时返回中文、可操作的 `partial`，
+  不抓取消费者搜索结果页；
+- 同步：Graph Spec、历史、本文、状态、能力契约与测试升级到 0.7.0；Figma 仍需
+  对既定 FigJam 的明确写入授权和截图核验。

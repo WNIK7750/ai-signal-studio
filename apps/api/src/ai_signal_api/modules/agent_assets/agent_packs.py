@@ -80,12 +80,17 @@ class AgentPackService:
             if not destination.is_relative_to(self.root):
                 raise AgentPackError("AGENT_PACK_PATH_UNSAFE")
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.exists() and not self._storage_matches(
+                destination,
+                digest,
+            ):
+                destination = (
+                    self.root / pack_id / f"{version}-{digest}"
+                ).resolve()
+                if not destination.is_relative_to(self.root):
+                    raise AgentPackError("AGENT_PACK_PATH_UNSAFE")
             if destination.exists():
-                if (
-                    not destination.is_dir()
-                    or self._content_digest(self._read_files(destination))
-                    != digest
-                ):
+                if not self._storage_matches(destination, digest):
                     raise AgentPackError("AGENT_PACK_STORAGE_CONFLICT")
             else:
                 try:
@@ -122,6 +127,13 @@ class AgentPackService:
             else:
                 self.session.commit()
             return model
+
+    def _storage_matches(self, destination: Path, digest: str) -> bool:
+        return (
+            destination.exists()
+            and destination.is_dir()
+            and self._content_digest(self._read_files(destination)) == digest
+        )
 
     def get_active(self, pack_id: str) -> AgentPackVersionModel:
         active = self._active(pack_id)

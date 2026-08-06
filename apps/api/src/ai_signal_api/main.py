@@ -16,6 +16,7 @@ from ai_signal_api.database import (
     ensure_runtime_schema,
 )
 from ai_signal_api.integrations.llm.chat import OpenAICompatibleModelChat
+from ai_signal_api.agent_runtime.contracts import WORKFLOW_VERSION
 from ai_signal_api.agent_runtime.harness import (
     RecoveryScanner,
     build_sqlite_checkpointer,
@@ -193,6 +194,7 @@ def create_app(
         )
         return {
             "status": "ok",
+            "workflow_version": WORKFLOW_VERSION,
             "providers": {
                 "llm": {
                     "provider": default_model.provider,

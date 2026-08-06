@@ -43,6 +43,7 @@ import {
   AgentConversationSummary,
   AgentMessage,
   AgentPlan,
+  AgentResultBlock,
   AgentTurn,
   AgentTurnEvent,
   AgentTurnResult,
@@ -76,6 +77,7 @@ const MAX_IMAGES = 4;
 const DRAFT_STORAGE_PREFIX = "ai-signal-agent:draft:v1:";
 const SCROLL_STORAGE_PREFIX = "ai-signal-agent:scroll:v1:";
 const ACTIVE_CONVERSATION_KEY = "ai-signal-agent:active-conversation:v1";
+const MODEL_STORAGE_PREFIX = "ai-signal-agent:model:v1:";
 
 type ConversationAction = {
   kind: "rename" | "pin" | "archive" | "restore" | "delete";
@@ -107,7 +109,9 @@ export function AgentScreen() {
     useState<PendingMessage | null>(null);
   const [sendError, setSendError] = useState("");
   const [draft, setDraft] = useState("");
-  const [selectedModelId, setSelectedModelId] = useState("");
+  const [selectedModelIds, setSelectedModelIds] = useState<
+    Record<string, string>
+  >({});
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const [imageError, setImageError] = useState("");
   const [voiceError, setVoiceError] = useState("");
@@ -125,6 +129,7 @@ export function AgentScreen() {
   const finalTranscriptSegmentsRef = useRef<Set<string>>(new Set());
   const closeTurnStreamRef = useRef<(() => void) | null>(null);
   const conversationThreadRef = useRef<HTMLDivElement | null>(null);
+  const activeConversationIdRef = useRef("");
   const scrollRestoreConversationRef = useRef("");
   const requestedInitialConversationRef = useRef(false);
   useEffect(() => {
@@ -161,7 +166,8 @@ export function AgentScreen() {
   });
   const models = useQuery({ queryKey: ["models"], queryFn: api.models });
   const activeModelId =
-    selectedModelId ||
+    selectedModelIds[activeConversationId] ||
+    readLocalValue(`${MODEL_STORAGE_PREFIX}${activeConversationId}`) ||
     models.data?.find((model: ModelConfig) => model.is_default)?.id ||
     models.data?.[0]?.id ||
     "";
@@ -184,6 +190,10 @@ export function AgentScreen() {
                     ...current,
                     status: "running",
                     plan: event.data.plan as AgentPlan,
+                    effective_model_id:
+                      typeof event.data.effective_model_id === "string"
+                        ? event.data.effective_model_id
+                        : current.effective_model_id,
                   }
                 : current,
             );
@@ -223,49 +233,25 @@ export function AgentScreen() {
     [queryClient],
   );
 
-  const agent = useMutation({
-    mutationFn: api.agent,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["agent-conversation", activeConversationId],
-      });
-      setPendingMessage(null);
-      scrollConversationToEnd();
-      void queryClient.invalidateQueries({
-        queryKey: ["agent-conversations"],
-      });
-      void queryClient.invalidateQueries({ queryKey: ["timeline"] });
-      void queryClient.invalidateQueries({ queryKey: ["runs"] });
-      void queryClient.invalidateQueries({ queryKey: ["collection-tasks"] });
-    },
-    onError: async (reason) => {
-      setSendError(
-        reason instanceof Error
-          ? reason.message
-          : "SYS-001（本地服务暂时不可用）",
-      );
-      await queryClient.invalidateQueries({
-        queryKey: ["agent-conversation", activeConversationId],
-      });
-      setPendingMessage(null);
-    },
-  });
   const researchTurn = useMutation({
     mutationFn: ({
       conversationId,
       message,
       clientMessageId,
       modelId,
+      artifactIds,
     }: {
       conversationId: string;
       message: string;
       clientMessageId: string;
       modelId?: string;
+      artifactIds: string[];
     }) =>
       api.createAgentTurn(conversationId, {
         message,
         client_message_id: clientMessageId,
         model_id: modelId,
+        artifact_ids: artifactIds,
       }),
     onSuccess: (turn) => {
       setActiveTurn(turn);
@@ -297,12 +283,27 @@ export function AgentScreen() {
     },
   });
   const isAgentBusy =
-    agent.isPending ||
     researchTurn.isPending ||
     (activeTurn !== null &&
       !["complete", "partial", "failed", "cancelled"].includes(
         activeTurn.status,
       ));
+  const streamedResultBlocks = useMemo<AgentResultBlock[]>(
+    () =>
+      turnEvents.reduce<AgentResultBlock[]>((blocks, event) => {
+        if (
+          event.type === "result.block" &&
+          isAgentResultBlock(event.data) &&
+          !blocks.some(
+            (candidate) => candidate.block_id === event.data.block_id,
+          )
+        ) {
+          blocks.push(event.data);
+        }
+        return blocks;
+      }, []),
+    [turnEvents],
+  );
   const createConversation = useMutation({
     mutationFn: () => api.createConversation(),
     onSuccess: (created) => {
@@ -369,6 +370,7 @@ export function AgentScreen() {
         action.conversation.id === activeConversationId
       ) {
         saveCurrentConversationScroll();
+        activeConversationIdRef.current = "";
         setActiveConversationId("");
       }
       if (action.kind === "restore") {
@@ -496,6 +498,7 @@ export function AgentScreen() {
       ) ?? listedConversations[0];
     const frame = requestAnimationFrame(() => {
       scrollRestoreConversationRef.current = nextConversation.id;
+      activeConversationIdRef.current = nextConversation.id;
       setActiveConversationId(nextConversation.id);
       setDraft(readDraft(nextConversation.id));
       writeSessionValue(ACTIVE_CONVERSATION_KEY, nextConversation.id);
@@ -552,6 +555,7 @@ export function AgentScreen() {
     setTurnEvents([]);
     setTurnElapsedMs(0);
     scrollRestoreConversationRef.current = conversationId;
+    activeConversationIdRef.current = conversationId;
     setActiveConversationId(conversationId);
     setDraft(readDraft(conversationId));
     writeSessionValue(ACTIVE_CONVERSATION_KEY, conversationId);
@@ -632,42 +636,32 @@ export function AgentScreen() {
     setImages([]);
     setImageError("");
     scrollConversationToEnd();
-    if (
-      attachedImages.length === 0 &&
-      isWorkspaceResearchRequest(value)
-    ) {
-      setActiveTurn({
-        id: "",
-        conversation_id: activeConversationId,
-        request_id: "",
-        client_message_id: clientMessageId,
-        status: "queued",
-        message: value,
-        workflow_version: "0.4.0",
-        plan: {},
-        result: {},
-        error: null,
-        total_duration_ms: 0,
-        created_at: new Date().toISOString(),
-        started_at: null,
-        completed_at: null,
-      });
-      researchTurn.mutate({
-        conversationId: activeConversationId,
-        message: value,
-        clientMessageId,
-        modelId: activeModelId || undefined,
-      });
-    } else {
-      agent.mutate({
-        message: value,
-        conversation_id: activeConversationId,
-        client_message_id: clientMessageId,
-        model_id: activeModelId || undefined,
-        image_urls: attachedImages.map((image) => image.dataUrl),
-        artifact_ids: attachedImages.map((image) => image.artifactId),
-      });
-    }
+    setActiveTurn({
+      id: "",
+      conversation_id: activeConversationId,
+      request_id: "",
+      client_message_id: clientMessageId,
+      status: "queued",
+      message: value,
+      workflow_version: "0.5.0",
+      requested_model_id: activeModelId || null,
+      effective_model_id: null,
+      manifest: {},
+      plan: {},
+      result: {},
+      error: null,
+      total_duration_ms: 0,
+      created_at: new Date().toISOString(),
+      started_at: null,
+      completed_at: null,
+    });
+    researchTurn.mutate({
+      conversationId: activeConversationId,
+      message: value,
+      clientMessageId,
+      modelId: activeModelId || undefined,
+      artifactIds: attachedImages.map((image) => image.artifactId),
+    });
   }
 
   async function addImages(fileList: FileList | null) {
@@ -1406,6 +1400,17 @@ export function AgentScreen() {
                       : undefined
                   }
                 />
+                {activeTurn.requested_model_id && (
+                  <small className="agent-model-runtime">
+                    请求模型：{activeTurn.requested_model_id}
+                    {activeTurn.effective_model_id
+                      ? ` · 实际模型：${activeTurn.effective_model_id}`
+                      : " · 正在确认实际模型"}
+                  </small>
+                )}
+                {streamedResultBlocks.length > 0 && (
+                  <AgentResultBlocks blocks={streamedResultBlocks} />
+                )}
               </div>
             </div>
           )}
@@ -1419,7 +1424,7 @@ export function AgentScreen() {
               </div>
             </div>
           )}
-          {agent.isPending && !activeTurn && (
+          {researchTurn.isPending && !activeTurn && (
             <div className="message message-assistant">
               <span className="message-avatar">
                 <IconRobot size={17} />
@@ -1475,8 +1480,10 @@ export function AgentScreen() {
             onChange={(event) => {
               const value = event.target.value;
               setDraft(value);
-              if (activeConversationId) {
-                writeDraft(activeConversationId, value);
+              const conversationId =
+                activeConversationIdRef.current || activeConversationId;
+              if (conversationId) {
+                writeDraft(conversationId, value);
               }
             }}
             onKeyDown={(event) => {
@@ -1533,7 +1540,19 @@ export function AgentScreen() {
                 <span className="sr-only">选择对话模型</span>
                 <select
                   value={activeModelId}
-                  onChange={(event) => setSelectedModelId(event.target.value)}
+                  onChange={(event) => {
+                    const modelId = event.target.value;
+                    setSelectedModelIds((current) => ({
+                      ...current,
+                      [activeConversationId]: modelId,
+                    }));
+                    if (activeConversationId) {
+                      writeLocalValue(
+                        `${MODEL_STORAGE_PREFIX}${activeConversationId}`,
+                        modelId,
+                      );
+                    }
+                  }}
                   disabled={models.isLoading || !models.data?.length}
                   aria-label="选择对话模型"
                 >
@@ -1744,19 +1763,28 @@ function writeSessionValue(key: string, value: string) {
   }
 }
 
+function readLocalValue(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalValue(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Model selection remains usable for the current render.
+  }
+}
+
 function errorMessage(reason: unknown): string {
   return reason instanceof Error
     ? reason.message
     : "SYS-001（会话操作失败）";
-}
-
-function isWorkspaceResearchRequest(message: string): boolean {
-  return (
-    /Agent/i.test(message) &&
-    /收集|采集|推荐|筛选|比较|趋势|开源|本地部署|Windows|官方证据/.test(
-      message,
-    )
-  );
 }
 
 function isAgentTurnResult(
@@ -1771,10 +1799,26 @@ function isAgentTurnResult(
   );
 }
 
+function isAgentResultBlock(
+  value: unknown,
+): value is AgentResultBlock {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.block_id === "string" &&
+    typeof record.type === "string" &&
+    typeof record.title === "string" &&
+    typeof record.data === "object" &&
+    record.data !== null
+  );
+}
+
 function capabilityLabel(capabilityId: string): string {
   const labels: Record<string, string> = {
     "collection.run.start": "采集 AI 信息",
+    "web.search.collect": "按需联网补证",
     "intelligence.timeline.query": "查询 AI 信息",
+    "intelligence.search": "统一检索 AI 信息",
     "intelligence.recommend": "推荐 AI 信息",
     "research.filter": "筛选 AI 信息",
     "research.recommend": "推荐 AI 信息",
@@ -1782,7 +1826,6 @@ function capabilityLabel(capabilityId: string): string {
     "research.compare": "比较 Agent 框架",
     "research.trend_brief": "整理趋势",
     "research.coverage_gap": "分析覆盖缺口",
-    collection_then_analyze: "采集后分析",
     "review.batch.submit": "提交审核",
     "poster.draft.generate": "生成卡片",
   };
@@ -1795,6 +1838,7 @@ function capabilityStatusLabel(status: string): string {
     partial: "部分完成",
     failed: "失败",
     running: "执行中",
+    skipped: "未执行",
   };
   return labels[status] ?? status;
 }

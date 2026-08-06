@@ -1,9 +1,10 @@
 id: collection
-version: 1.0.0
+version: 1.1.0
 title: 信息采集
-description: 从已启用来源采集 AI 信息并保留逐来源错误
+description: 从已启用来源采集，并在本地证据不足时受控联网抓取与缓存
 capabilities:
   - collection.run.start
+  - web.search.collect
 result_blocks:
   - collection_summary
   - partial_failure

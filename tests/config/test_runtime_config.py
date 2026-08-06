@@ -89,4 +89,5 @@ def test_health_exposes_configuration_state_without_exposing_keys(
         "configured": True,
         "model": "configured-model",
     }
+    assert body["workflow_version"] == "0.7.0"
     assert "sk-test-secret" not in response.text

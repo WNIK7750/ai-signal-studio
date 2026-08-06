@@ -73,7 +73,9 @@ export function SourcesScreen() {
         ? { repository: endpoint }
         : kind === "rss"
           ? { url: endpoint }
-          : {};
+          : kind === "web_search"
+            ? { origin: endpoint }
+            : {};
     return {
       name: String(data.get("name")),
       kind,
@@ -170,6 +172,7 @@ export function SourcesScreen() {
                   defaultValue={String(
                     editingSource?.config.url ??
                       editingSource?.config.repository ??
+                      editingSource?.config.origin ??
                       "",
                   )}
                   required
@@ -227,7 +230,7 @@ export function SourcesScreen() {
               <div className="source-main">
                 <strong>{source.name}</strong>
                 <small>
-                  {source.kind} ·{" "}
+                  {source.kind === "web_search" ? "网络搜索缓存来源" : source.kind} ·{" "}
                   {source.last_success_at
                     ? `最近成功 ${new Date(source.last_success_at).toLocaleString(
                         "zh-CN",
@@ -248,10 +251,17 @@ export function SourcesScreen() {
                 <button
                   className="secondary-button compact-button"
                   onClick={() => test.mutate(source.id)}
-                  disabled={testingSourceId === source.id}
+                  disabled={
+                    source.kind === "web_search" ||
+                    testingSourceId === source.id
+                  }
                 >
                   <IconActivityHeartbeat size={15} />
-                  {testingSourceId === source.id ? "测试中" : "测试"}
+                  {source.kind === "web_search"
+                    ? "自动管理"
+                    : testingSourceId === source.id
+                      ? "测试中"
+                      : "测试"}
                 </button>
                 <button
                   className="icon-button"

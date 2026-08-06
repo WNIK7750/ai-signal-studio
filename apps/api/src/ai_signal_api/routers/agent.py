@@ -1,4 +1,5 @@
 from typing import Literal
+from uuid import uuid4
 
 import asyncio
 import json
@@ -16,7 +17,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ai_signal_api.agent_runtime.service import WorkspaceAgentService
 from ai_signal_api.agent_runtime.contracts import (
     AgentTurnCreate,
     AgentTurnRead,
@@ -31,20 +31,22 @@ from ai_signal_api.agent_runtime.harness import (
 from ai_signal_api.capabilities.registry import build_capability_executor
 from ai_signal_api.dependencies import get_session
 from ai_signal_api.models import (
+    AgentMessageModel,
     AgentTurnEventModel,
     AgentTurnModel,
     CapabilityInvocationModel,
 )
 from ai_signal_api.modules.agent.conversation_service import (
     AgentConversationService,
-    AgentTurnInProgressError,
 )
 from ai_signal_api.modules.agent_assets.artifacts import ArtifactService
+from ai_signal_api.modules.models.service import ModelConfigurationError
 from ai_signal_api.schemas import (
     AgentConversationCreate,
     AgentConversationPatch,
     AgentConversationRead,
     AgentConversationSummary,
+    AgentCapabilityCall,
     AgentRunRequest,
     AgentRunResponse,
     CapabilityInvocationRead,
@@ -66,6 +68,18 @@ def create_agent_turn(
     request: Request,
     session: Session = Depends(get_session),
 ) -> AgentTurnRead:
+    artifacts = ArtifactService(
+        session,
+        request.app.state.settings.artifact_root,
+        request.app.state.settings.artifact_max_bytes,
+    )
+    try:
+        attached_artifacts = [
+            artifacts.get(artifact_id)
+            for artifact_id in payload.artifact_ids
+        ]
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
     executor = build_capability_executor(
         session,
         request.app.state.settings,
@@ -79,15 +93,39 @@ def create_agent_turn(
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     if created:
-        background_tasks.add_task(
-            process_turn,
-            request.app.state.session_factory,
-            request.app.state.settings,
-            request.app.state.model_configuration,
-            request.app.state.agent_checkpointer,
-            turn.id,
-            payload.model_id,
-        )
+        image_artifact_ids = [
+            artifact.id
+            for artifact in attached_artifacts
+            if artifact.media_type.startswith("image/")
+        ]
+        if image_artifact_ids:
+            try:
+                AgentTurnService(session).complete_direct_response(
+                    turn.id,
+                    model_service=request.app.state.model_configuration,
+                    model_chat=request.app.state.model_chat,
+                    model_id=payload.model_id,
+                    image_urls=[
+                        artifacts.image_data_url(artifact_id)
+                        for artifact_id in image_artifact_ids
+                    ],
+                )
+            except ValueError as error:
+                raise HTTPException(
+                    status_code=422,
+                    detail=str(error),
+                ) from error
+            turn = AgentTurnService(session).read(turn.id)
+        else:
+            background_tasks.add_task(
+                process_turn,
+                request.app.state.session_factory,
+                request.app.state.settings,
+                request.app.state.model_configuration,
+                request.app.state.agent_checkpointer,
+                turn.id,
+                payload.model_id,
+            )
     return turn
 
 
@@ -390,17 +428,177 @@ def run_agent(
             artifacts.get(artifact_id)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    agent = WorkspaceAgentService(
-        build_capability_executor(session, request.app.state.settings),
-        request.app.state.model_configuration,
-        request.app.state.model_chat,
-    )
     try:
-        return AgentConversationService(session).run_turn(payload, agent)
+        conversation_id = payload.conversation_id
+        if conversation_id is None:
+            conversation_id = AgentConversationService(
+                session
+            ).read_current().id
+        executor = build_capability_executor(
+            session,
+            request.app.state.settings,
+        )
+        invalid_model_error: ModelConfigurationError | None = None
+        execution_model_id = payload.model_id
+        if not payload.image_urls:
+            try:
+                request.app.state.model_configuration.select_for_request(
+                    payload.model_id
+                )
+            except ModelConfigurationError as error:
+                invalid_model_error = error
+                execution_model_id = None
+        turn, created = AgentTurnService(session).create(
+            conversation_id,
+            AgentTurnCreate(
+                message=payload.message,
+                client_message_id=(
+                    payload.client_message_id
+                    or f"legacy-{uuid4().hex}"
+                ),
+                model_id=payload.model_id,
+                artifact_ids=payload.artifact_ids,
+            ),
+            capability_ids=executor.registry.ids(),
+        )
+        if created:
+            if payload.image_urls:
+                AgentTurnService(session).complete_direct_response(
+                    turn.id,
+                    model_service=request.app.state.model_configuration,
+                    model_chat=request.app.state.model_chat,
+                    model_id=payload.model_id,
+                    image_urls=payload.image_urls,
+                )
+            else:
+                process_turn(
+                    request.app.state.session_factory,
+                    request.app.state.settings,
+                    request.app.state.model_configuration,
+                    request.app.state.agent_checkpointer,
+                    turn.id,
+                    execution_model_id,
+                )
+        session.expire_all()
+        turn = AgentTurnService(session).read(turn.id)
+        messages = list(
+            session.scalars(
+                select(AgentMessageModel).where(
+                    AgentMessageModel.turn_id == turn.id
+                )
+            )
+        )
+        user_message = next(
+            (item for item in messages if item.role == "user"),
+            None,
+        )
+        assistant_message = next(
+            (item for item in messages if item.role == "assistant"),
+            None,
+        )
+        result = turn.result or {
+            "status": turn.status,
+            "errors": [turn.error] if turn.error else [],
+        }
+        result_errors = result.get("errors", [])
+        if any(
+            item.get("code") == "CAPABILITY_DISABLED"
+            for item in result_errors
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="CAPABILITY_DISABLED",
+            )
+        compatibility_result = result
+        steps = turn.plan.get("steps", [])
+        deterministic_compatibility = (
+            len(steps) == 1
+            and steps[0].get("capability_id")
+            in {
+                "collection.run.start",
+                "intelligence.timeline.query",
+                "review.batch.submit",
+                "poster.draft.generate",
+                "task.draft.propose",
+            }
+        )
+        if invalid_model_error is not None and not deterministic_compatibility:
+            return AgentRunResponse(
+                message=str(invalid_model_error),
+                capability_calls=[],
+                result={
+                    "status": "failed",
+                    "error_code": invalid_model_error.code,
+                },
+                requested_model_id=payload.model_id,
+                effective_model_id=None,
+                model_switched=False,
+                conversation_id=turn.conversation_id,
+                user_message_id=(
+                    user_message.id if user_message is not None else None
+                ),
+                assistant_message_id=(
+                    assistant_message.id
+                    if assistant_message is not None
+                    else None
+                ),
+            )
+        if len(steps) == 1:
+            capability_result = result.get(
+                "capability_results",
+                {},
+            ).get(steps[0].get("step_id"))
+            if capability_result is not None:
+                compatibility_result = capability_result
+        schedule_draft = (
+            compatibility_result.get("schedule_draft")
+            if isinstance(compatibility_result, dict)
+            else None
+        )
+        task_draft = (
+            compatibility_result.get("task_draft")
+            if isinstance(compatibility_result, dict)
+            else None
+        )
+        return AgentRunResponse(
+            message=(
+                assistant_message.content
+                if assistant_message is not None
+                else "任务未完成，请查看可定位错误。"
+            ),
+            capability_calls=[
+                AgentCapabilityCall(
+                    capability_id=str(step.get("capability_id")),
+                    status=str(
+                        result.get("capability_results", {})
+                        .get(step.get("step_id"), {})
+                        .get("status", "completed")
+                    ),
+                )
+                for step in turn.plan.get("steps", [])
+                if step.get("capability_id") != "agent.message.complete"
+            ],
+            result=compatibility_result,
+            schedule_draft=schedule_draft,
+            task_draft=task_draft,
+            requested_model_id=turn.requested_model_id,
+            effective_model_id=turn.effective_model_id,
+            model_switched=bool(
+                turn.requested_model_id
+                and turn.requested_model_id != turn.effective_model_id
+            ),
+            conversation_id=turn.conversation_id,
+            user_message_id=(
+                user_message.id if user_message is not None else None
+            ),
+            assistant_message_id=(
+                assistant_message.id
+                if assistant_message is not None
+                else None
+            ),
+        )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except AgentTurnInProgressError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.get(

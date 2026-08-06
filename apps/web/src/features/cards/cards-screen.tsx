@@ -302,6 +302,7 @@ export function CardsScreen() {
               ["demo", "示例来源"],
               ["rss", "RSS"],
               ["github_releases", "GitHub Releases"],
+              ["web_search", "网络搜索"],
             ].map(([value, label]) => (
               <label key={value}>
                 <input

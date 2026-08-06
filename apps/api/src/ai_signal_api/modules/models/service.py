@@ -66,6 +66,9 @@ class ResolvedModel:
     output_token_limit: int | None
     enabled: bool
     is_default: bool
+    connection_status: str = "pending"
+    connection_checked_at: datetime | None = None
+    connection_error_code: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -92,6 +95,10 @@ def _parse_datetime(value: str | None) -> datetime:
     if not value:
         return _utc_now()
     return datetime.fromisoformat(value)
+
+
+def _parse_optional_datetime(value: str | None) -> datetime | None:
+    return datetime.fromisoformat(value) if value else None
 
 
 class LocalModelConfigStore:
@@ -139,6 +146,9 @@ class LocalModelConfigStore:
                         "output_token_limit": None,
                         "enabled": True,
                         "is_default": True,
+                        "connection_status": "pending",
+                        "connection_checked_at": None,
+                        "connection_error_code": None,
                         "created_at": now,
                         "updated_at": now,
                     }
@@ -154,6 +164,9 @@ class LocalModelConfigStore:
                         "output_token_limit": None,
                         "enabled": True,
                         "is_default": True,
+                        "connection_status": "not_applicable",
+                        "connection_checked_at": None,
+                        "connection_error_code": None,
                         "created_at": now,
                         "updated_at": now,
                     }
@@ -359,6 +372,9 @@ class ModelConfigurationService:
             "output_token_limit": values.get("output_token_limit"),
             "enabled": bool(values.get("enabled", True)),
             "is_default": is_default,
+            "connection_status": "pending",
+            "connection_checked_at": None,
+            "connection_error_code": None,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         }
@@ -485,6 +501,9 @@ class ModelConfigurationService:
                 "model_id": runtime_model_id,
                 "provider_id": provider["id"],
                 "updated_at": now,
+                "connection_status": "pending",
+                "connection_checked_at": None,
+                "connection_error_code": None,
             }
         )
         for field in ("supports_vision", "output_token_limit"):
@@ -575,7 +594,72 @@ class ModelConfigurationService:
             raise ModelConfigurationError("MODEL-008")
         if not model.has_api_key:
             raise ModelConfigurationError("SECRET-003")
-        model_chat.complete(model, "请只回复 OK", [])
+        try:
+            model_chat.complete(model, "请只回复 OK", [])
+        except ModelConfigurationError as error:
+            self._set_connection_state(
+                model_id,
+                status="error",
+                error_code=error.code,
+                checked=True,
+            )
+            raise
+        except Exception as error:
+            self._set_connection_state(
+                model_id,
+                status="error",
+                error_code="MODEL-005",
+                checked=True,
+            )
+            raise ModelConfigurationError("MODEL-005") from error
+        self._set_connection_state(
+            model_id,
+            status="healthy",
+            error_code=None,
+            checked=True,
+        )
+
+    def mark_needs_retest(
+        self,
+        model_id: str,
+        error_code: str,
+    ) -> None:
+        """Flag a likely provider-side failure without making another call."""
+
+        self._set_connection_state(
+            model_id,
+            status="needs_retest",
+            error_code=error_code,
+            checked=False,
+        )
+
+    def _set_connection_state(
+        self,
+        model_id: str,
+        *,
+        status: str,
+        error_code: str | None,
+        checked: bool,
+    ) -> None:
+        config = self.store.read_config()
+        target = next(
+            (
+                item
+                for item in config["models"]
+                if item["id"] == model_id and item.get("enabled", True)
+            ),
+            None,
+        )
+        if target is None:
+            raise ModelConfigurationError("MODEL-001")
+        if target["provider_id"] == "provider_local":
+            return
+        target["connection_status"] = status
+        target["connection_error_code"] = error_code
+        target["connection_checked_at"] = (
+            _utc_now().isoformat() if checked else None
+        )
+        self.store.write_config(config)
 
     def select_for_request(
         self,
@@ -621,6 +705,9 @@ class ModelConfigurationService:
                 output_token_limit=model.get("output_token_limit"),
                 enabled=bool(model.get("enabled", True)),
                 is_default=bool(model.get("is_default")),
+                connection_status="not_applicable",
+                connection_checked_at=None,
+                connection_error_code=None,
                 created_at=_parse_datetime(model.get("created_at")),
                 updated_at=_parse_datetime(model.get("updated_at")),
             )
@@ -647,6 +734,13 @@ class ModelConfigurationService:
             output_token_limit=model.get("output_token_limit"),
             enabled=bool(model.get("enabled", True)),
             is_default=bool(model.get("is_default")),
+            connection_status=str(
+                model.get("connection_status", "pending")
+            ),
+            connection_checked_at=_parse_optional_datetime(
+                model.get("connection_checked_at")
+            ),
+            connection_error_code=model.get("connection_error_code"),
             created_at=_parse_datetime(model.get("created_at")),
             updated_at=_parse_datetime(model.get("updated_at")),
         )

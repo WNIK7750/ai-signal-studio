@@ -1,8 +1,9 @@
 id: intelligence
-version: 1.0.0
+version: 1.1.0
 title: AI 信息库
-description: 查询、筛选和推荐真实保存的 AI 信息
+description: 跨产品阶段统一检索、去重、筛选并推荐真实保存的 AI 信息
 capabilities:
+  - intelligence.search
   - intelligence.timeline.query
   - intelligence.recommend
   - information.state.update

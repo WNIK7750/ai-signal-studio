@@ -1,19 +1,39 @@
 id: agent_task_graph
-version: 0.4.0
-workflow_version: 0.4.0
+version: 0.7.0
+workflow_version: 0.7.0
 status: target
 feature_flag: agent.langgraph_runtime
 schemas:
-  input: AgentTurnInputV1
-  state: AgentTaskStateV1
-  output: AgentTurnResultV1
-  state_schema_version: 1.0.0
-  plan_schema_version: 1.0.0
-  event_schema_version: 1.0.0
-  context_contract_version: 1.0.0
+  input: AgentTurnInputV2
+  state: AgentTaskStateV2
+  output: AgentTurnResultV2
+  state_schema_version: 1.2.0
+  plan_schema_version: 1.2.0
+  event_schema_version: 1.2.0
+  context_contract_version: 1.3.0
 runtime:
   framework: langgraph
   agent_framework: langchain
+  provider_compatibility:
+    core_contract: provider_agnostic
+    default_profile: openai-compatible
+    profiles:
+      openai-compatible:
+        structured_output_method: function_calling
+      dashscope-openai-compatible:
+        structured_output_method: function_calling
+        extra_body:
+          enable_thinking: false
+    structured_output_repair:
+      include_raw: true
+      max_schema_attempts: 2
+      unstructured_json_fallback: false
+  model_connection_policy:
+    mark_pending_on: [model_created, model_configuration_edited]
+    explicit_test_on: [user_connection_test]
+    mark_needs_retest_on: [suspected_provider_error]
+    skip_on: [normal_model_selection, healthy_conversation_turn]
+    states: [pending, healthy, needs_retest, error, not_applicable]
   checkpointer:
     local: sqlite
     path: data/agent-checkpoints.db
@@ -34,6 +54,9 @@ execution_manifest:
     - domain_pack_versions
     - tool_catalog_version
     - model_config_ref
+    - requested_model_id
+    - effective_model_id
+    - artifact_ids
     - capability_snapshot_digest
 domain_catalog:
   version: 1.0.0
@@ -53,6 +76,145 @@ domain_catalog:
     max_tools_per_model_call: 8
     disabled_capabilities_hidden: true
     forged_disabled_calls_rejected: true
+  planning_contracts:
+    collection.run.start:
+      kind: capability
+      domain: collection
+      side_effect: external
+      risk: low
+      acceptance_policy: capability_effect.v1
+    intelligence.search:
+      kind: capability
+      domain: intelligence
+      side_effect: read
+      risk: low
+      acceptance_policy: information_results.v1
+    web.search.collect:
+      kind: capability
+      domain: collection
+      side_effect: external
+      risk: low
+      acceptance_policy: capability_effect.v1
+    intelligence.timeline.query:
+      kind: capability
+      domain: intelligence
+      side_effect: read
+      risk: low
+      acceptance_policy: information_results.v1
+    research.recommend:
+      kind: domain_agent
+      domain: intelligence
+      side_effect: read
+      risk: low
+      acceptance_policy: information_results.v1
+    research.trend_brief:
+      kind: domain_agent
+      domain: intelligence
+      side_effect: read
+      risk: low
+      acceptance_policy: synthesis_grounded.v1
+  server_owned_plan_fields:
+    normalize_from_capability_contract:
+      [domain, kind, side_effect, risk, acceptance_policy]
+    normalize_from_goal:
+      [lookback_hours, max_items, ranking_criterion]
+    purpose:
+      - prevent_model_defined_approval_policy
+      - prevent_unknown_domain_context_loading
+      - avoid_replanning_for_provider_field_aliases
+  context_engineering:
+    version: context-budget@1.0.0
+    principles: [write, select, compress, isolate]
+    stable_prefix:
+      base_prompt_versioned: true
+      deterministic_json_serialization: true
+      dynamic_values_after_base: true
+    working_memory:
+      source: [persisted_plan, step_statuses, bounded_errors]
+      model_authored_free_form_memory: false
+      fields: [objective, active_step_id, todo, notes]
+      raw_stack_traces: false
+      recite_before_model_step: true
+    compaction:
+      trigger: serialized_payload_exceeds_layer_budget
+      strategy: deterministic_bounded_json
+      always_valid_json: true
+      preserve: [ids, paths, urls, objective, status, error_code]
+      destructive_context_purge: false
+      optional_model_summarizer: deferred_until_eval_justifies_cost
+    isolation:
+      task_scratchpad_scope: turn
+      conversation_scope: bounded_recent_messages_and_result_refs
+      long_term_scope: agent_pack_and_artifact_capabilities
+      completed_turn_behavior: discard_derived_scratchpad_keep_references
+  reasoning_contract:
+    kind: model_reasoning
+    capability_id: null
+    side_effect: read
+    acceptance_policy: contextual_response.v1
+    tools_optional: true
+    allowed_basis: [conversation_context, tool_evidence, mixed]
+    selected_model: effective_model_id
+  research_analysis_contract:
+    model_calls_per_turn: 1
+    invalid_structured_output_retry_calls: 1
+    selected_model: effective_model_id
+    default_generated_language: zh-CN
+    source_content_language: preserve
+    recommendation_step: research.recommend
+    trend_step: research.trend_brief
+    shared_structured_output: ResearchAnalysisSynthesisV1
+    provider_output_normalization:
+      structured_payload_sources: [parsed, tool_calls.arguments, content_json]
+      invalid_or_duplicate_recommendation_ids: ignore
+      missing_recommendations: fill_from_bounded_capability_ranking
+      invented_trend_citations: ground_to_selected_information_ids
+      additional_model_calls: 0
+    deterministic_degraded_result:
+      preserve_capability_ranked_items: true
+      explain_provider_error_in_chinese: true
+      fabricate_information: false
+  saved_evidence_backfill:
+    exact_window_first: true
+    activate_when_items_below_goal: true
+    source: persisted_workspace_information
+    disclose_requested_item_count: true
+    disclose_effective_lookback_hours: true
+    disclose_backfilled_information_ids: true
+    never_relabel_background_as_exact_window: true
+    empty_candidates:
+      execute_both_steps: true
+      fabricate_information: false
+      step_outcome: partial
+  unified_intelligence_retrieval:
+    identity: intelligence_id
+    scopes: [pending, intelligence, archived, cards]
+    lexical_rank: sqlite_fts5_bm25
+    short_query_fallback: substring_match
+    rank_fusion:
+      algorithm: reciprocal_rank_fusion
+      k: 60
+      rankings: [lexical, recency, priority, product_stage]
+    near_duplicate_grouping:
+      algorithm: unicode_trigram_simhash64
+      max_hamming_distance: 3
+    model_input: compact_top_candidates_only
+  conditional_web_evidence:
+    capability: web.search.collect
+    activate_when: local_results_below_goal
+    search_provider_adapter: provider_neutral
+    configured_provider: brave
+    pipeline:
+      - structured_web_search
+      - robots_and_safe_url_gate
+      - bounded_page_crawl
+      - ttl_cache
+      - raw_item_normalization
+      - intelligence_analysis_and_tags
+      - unified_search_refresh
+    external_content_untrusted: true
+    full_page_body_in_graph_state: false
+    missing_provider: partial_with_actionable_error
 budgets:
   max_plan_steps: 5
   max_active_domains_per_step: 3
@@ -102,6 +264,8 @@ acceptance_policies:
   - information_results.v1
   - capability_effect.v1
   - artifact_created.v1
+  - synthesis_grounded.v1
+  - contextual_response.v1
 planning_modes:
   direct:
     source: deterministic
@@ -123,10 +287,11 @@ nodes:
   - id: N03
     name: normalize_input
     owner: agent_runtime
+    output: AgentGoalSpecV1
   - id: N04
     name: bootstrap_context
     owner: agent_runtime
-    context_layers: [base, workspace_policy, agent_pack, capability_snapshot, domain_index]
+    context_layers: [base, workspace_policy, conversation_window, prior_turn_refs, bounded_result_summaries, restorable_references, agent_pack, capability_snapshot, domain_index]
   - id: N05
     name: route_complexity
     owner: agent_runtime
@@ -138,9 +303,11 @@ nodes:
     name: build_structured_plan
     owner: agent_runtime
     implementation: langchain_structured_output
+    output: AgentPlanningOutputV1
   - id: N08
     name: validate_plan
     owner: agent_runtime
+    validation: [dag, goal_coverage, time_window, item_limit, ranking, deliverables, capability_registry]
   - id: N09
     name: clarify_and_wait
     owner: agent_runtime
@@ -152,11 +319,14 @@ nodes:
   - id: N11
     name: assemble_step_context_and_tools
     owner: agent_runtime
-    context_layers: [base, workspace_policy, conversation, domain, task_step, evidence, tool_schema]
+    context_layers: [base, workspace_policy, conversation, domain, task_step, working_memory, evidence, tool_schema]
+    tool_loading: optional_for_model_reasoning
   - id: N12
     name: bind_action
     owner: agent_runtime
-    output: ActionEnvelopeV1
+    output: ActionEnvelopeV2
+    bindings: [query_time_window, candidate_ids_from_query, selected_ids_for_synthesis]
+    bypass_when: model_reasoning
   - id: N13
     name: validate_action
     owner: module_domain
@@ -164,6 +334,7 @@ nodes:
   - id: N14
     name: capability_policy_gate
     owner: capabilities
+    bypass_when: validated_read_only_model_reasoning
   - id: N15
     name: approve_and_wait
     owner: capabilities
@@ -171,13 +342,16 @@ nodes:
   - id: N16
     name: route_executor
     owner: agent_runtime
+    routes: [atomic_capability, bounded_domain_agent, model_reasoning, known_domain_workflow]
   - id: N17
     name: execute_capability
     owner: capabilities
   - id: N18
     name: execute_bounded_domain_agent
     owner: module_domain
-    implementation: langchain_create_agent
+    implementation: selected_model_reasoning_or_langchain_create_agent
+    selected_model: effective_model_id
+    outputs: [validated_tool_result, validated_model_response, shared_recommendation_and_trend_analysis]
   - id: N19
     name: execute_domain_workflow
     owner: module_domain
@@ -186,19 +360,28 @@ nodes:
     name: record_event_evidence_artifact
     owner: agent_runtime
     persist_before_continue: true
+    stream_projection: complete_validated_result_block
   - id: N21
     name: join_results
     owner: agent_runtime
+    responsibilities: [deduplicate_information_ids, merge_evidence_refs, deduplicate_uncertainties, preserve_partial_results]
   - id: N22
     name: inspect_outcome
     owner: agent_runtime
     evaluation_order: [schema, resource_refs, acceptance_policy, optional_quality_judge]
+    complete_requires: [goal_coverage, requested_item_count_or_explicit_gap, grounded_synthesis]
+    recoverable_coverage_gap:
+      statuses: [partial]
+      continue_dependents: true
+      applies_to: [empty_timeline, insufficient_candidates, empty_grounded_synthesis]
   - id: N23
     name: control_retry_replan_budget
     owner: agent_runtime
   - id: N24
     name: compose_result
     owner: agent
+    always_emit: [result_summary]
+    error_projection: localized_reason_and_retryability
   - id: N25
     name: finalize_outcome
     owner: agent_runtime
@@ -262,7 +445,7 @@ edges:
     when: atomic_capability
   - from: N16
     to: N18
-    when: bounded_agentic_step
+    when: bounded_agentic_step_or_model_reasoning
   - from: N16
     to: N19
     when: known_domain_workflow
@@ -303,14 +486,16 @@ waiting_status_projection:
 checkpoint_after: [N04, N08, N09, N15, N17, N18, N19, N20, N21, N24, N25]
 side_effect_nodes: [N17, N18, N19]
 idempotency:
-  key: turn_id + step_id + capability_id + canonical_input_digest
+  capability_step_key: turn_id + step_id + capability_id + canonical_input_digest
+  model_reasoning_step: no_external_side_effect
 artifacts:
   graph_state_contains_references_only: true
   large_result_storage: business_store_or_artifact_store
 stream:
-  projection: AgentTurnEventV1
+  projection: AgentTurnEventV2
   ordered_sequence: true
   resumable: true
+  analysis_events: [model.research.started, model.research.completed, step.outcome]
 security:
   external_evidence_untrusted: true
   capability_gate_is_authoritative: true
@@ -330,9 +515,17 @@ documentation:
   tasks: docs/07-delivery/07-04-optimization-implementation-status.md
   figma: https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad
 implementation_sync:
-  date: 2026-08-06
-  workflow_version: 0.4.0
-  figma_node: "3:304"
+  date: 2026-08-07
+  workflow_version: 0.7.0
+  figma_node: "12:364"
+  figma_diagram_first_node: "10:305"
+  figma_diagram_last_node: "10:385"
+  figma_sync_status: complete
+  figma_screenshot_verified: true
   evidence:
+    - tests/modules/intelligence/test_unified_search.py
+    - tests/modules/collection/test_web_discovery.py
+    - tests/modules/agent_runtime/test_goal_plan_coverage.py
+    - tests/api/test_agent_complex_turns.py
     - tests/modules/agent_runtime/test_context.py
     - tests/evals/agent/test_release_eval_harness.py

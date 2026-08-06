@@ -1045,3 +1045,107 @@ Domain Pack 与 Capability 覆盖
 3. Figma 默认维护“当前目标版本”；需要保留视觉差异时在同一 FigJam 中并排新增版本。
 4. 文档、Figma 和 Graph Spec 使用同一个 `workflow_version`。
 5. PR/交接说明必须列出图谱版本；没有同步图谱的 Agent 工作流变更不算完成。
+
+### 16.1 0.6.0 工具可选与语境推理补充
+
+`workflow_version=0.6.0` 保留 N01～N25 主拓扑，但把“是否调用工具”变成 Planner 的
+受控决策，而不是默认前提：
+
+- 工作区实时事实、业务查询与副作用动作优先使用 Capability；
+- 解释、归纳、比较和指代前文的追问可使用 `model_reasoning`；
+- 该步骤不创建虚假 Tool Call，只装配 Base Policy、当前 Goal、最近消息、前序 Turn
+  的小型 Result 摘要和已完成步骤输出；
+- 所选模型必须返回自然语言结果，运行时补充并校验 basis、证据边界、
+  `effective_model_id` 与已有 `information_id`；
+- 上下文不足时明确说明缺口仍是有效回答，不得虚构三条信息或实时排名。
+
+模型连接检测与 Agent 推理调用分离：新建或编辑模型进入 `pending`，用户通过连接按钮
+显式检测一次；正常对话只使用已保存配置；疑似 Provider 故障标记 `needs_retest`，
+不在保存动作或每轮对话前自动消耗模型请求。
+
+### 16.2 0.6.0 推荐与趋势共用模型分析补充
+
+实机回归发现：`intelligence.timeline.query` 返回 0 条时，N22 将数量缺口直接判为
+`failed`，N10 随后把 `research.recommend` 与 `research.trend_brief` 标为依赖跳过。
+这会把诚实的空证据误当成执行失败，也使两个模型占比较高的分析步骤完全没有运行。
+
+0.6.0 的修订规则如下：
+
+- `research.recommend` 作为 `domain_agent` 进入 N18；它先调用已验证 Capability 获得
+  有界候选，再由本轮 `effective_model_id` 返回结构化推荐与趋势分析；
+- 推荐和趋势共用一次 `ResearchAnalysisSynthesis`，后续
+  `research.trend_brief` 仍保留独立 Capability Invocation，但复用同一份模型综合，
+  避免对同一证据重复调用模型；
+- N22 将空时间线、候选不足和无引用可形成的空综合识别为可恢复覆盖缺口：
+  当前步骤为 `partial`，依赖步骤继续，而不是 `failed → skipped_dependency`；
+- 候选为空时模型只能说明证据缺口，推荐和 finding 必须为空，严禁补造热点、
+  `information_id`、来源或影响力数字；
+- OpenAI-compatible Provider 若遗漏部分推荐、返回重复/无效推荐 ID，运行时保留有效的
+  模型选择与理由，并仅从 Capability 已排序的真实候选中补足用户要求数量；趋势引用
+  同样只允许落到本轮已选真实 ID。结构化载荷同时支持 SDK 已解析对象、标准
+  `tool_calls[].function.arguments` 与正文 JSON；该兼容修复不增加模型调用，并在结果
+  元数据中记录；
+- `model.research.started/completed` 与 `step.outcome` 进入有序事件流；UI 据此显示
+  “部分完成”，并渲染推荐说明、趋势证据边界和覆盖缺口。
+
+### 16.3 证据窗口、中文输出与结果总结
+
+- 精确时间窗仍是第一查询边界；少于目标数量时，研究 Capability 可从工作区已保存信息
+  中补充更宽的近期背景，但必须同时返回精确命中数、实际回溯小时数和补充 ID，不能把
+  三天背景写成“24 小时热点”；
+- 原始标题、摘要、来源名与专有名词保持原文；Planner、推荐理由、趋势、不确定性、
+  错误说明和结果总结默认使用简体中文。Provider 返回英文加工文本时，使用中文的
+  确定性安全文案，不改写来源事实；
+- N21 合并重复证据 ID 与重复不确定性；N24 每轮必产出一个 `result_summary`，列出
+  状态、推荐数、证据数、背景补充数和可操作错误；
+- 结构化输出先兼容 `parsed / tool_calls.arguments / content JSON`，失败时至多追加
+  一次无工具 JSON 重试；仍失败则保留 Capability 的真实排序和中文确定性结果，并
+  明确说明模型格式错误，不再显示笼统的“请查看可定位错误”。
+
+### 16.4 0.7.0 统一检索与按需联网补证
+
+`workflow_version=0.7.0` 保留 N01～N25 LangGraph 节点，但把复杂研究的计划链调整为：
+
+```text
+collection.run.start
+→ intelligence.search
+→ web.search.collect（本地候选足够时无网络跳过）
+→ research.recommend
+→ research.trend_brief
+```
+
+- `intelligence.search` 不为待处理、情报库、已归档和卡片维护四份重复索引，而是以
+  `intelligence_id` 为主记录，并把产品阶段作为可筛选 facet；
+- SQLite 使用 FTS5 BM25，少于 3 个字符的中文或英文查询使用安全子串兜底；文本、
+  时效、优先级和产品阶段排名用 RRF 融合；返回前仅对 Top 候选做 64 位 SimHash
+  近重复分组；
+- `web.search.collect` 的输入包含本地候选数与最低目标数；本地充足时返回 completed
+  skip，不消耗 Search API；不足时使用 Provider Adapter 获取结构化 URL；
+- URL 必须经过公网 DNS、重定向、robots、MIME、正文大小与数量边界；页面先进入
+  TTL 缓存，再走既有 RawItem → Intelligence 分析、标签、优先级和 canonical URL
+  去重；
+- Graph State 只保留紧凑候选、真实 ID、来源和摘要，不保存缓存中的完整网页正文；
+- 模型只处理融合后的有限候选，输出中文推荐理由、分级、标签与综合；Provider
+  不可用时保留本地确定性结果，并在唯一 `result_summary` 中说明错误、缓存与补证数。
+
+### 16.5 0.7.0 上下文预算、工作记事板与任务隔离修订
+
+本修订不增加 LangGraph 节点，也不引入第二套记忆数据库。Context Contract 升级为
+`1.3.0`，在 N04、N11 和 N18 内落实以下四层：
+
+1. 写入：Plan、步骤状态、错误码、ResultBlock、Agent Pack 和 Artifact 继续保存在
+   Context Window 之外；不把自由文本 scratchpad 当作新的事实来源。
+2. 选择：N11 只装配当前步骤 Domain 和已注册 Capability；工作区事实继续通过
+   `intelligence.search`、Agent Pack 或 Artifact Capability 即时检索。
+3. 压缩：模型载荷不再使用字符串切片截断 JSON。超过层预算时采用确定性、稳定排序的
+  合法 JSON 压缩，优先保留 ID、站内路径、来源 URL、目标、状态和错误码，并记录
+   `context.compacted`；是否增加小模型摘要器留给评测证明其收益后再决定。
+4. 隔离：每个 Turn 从持久 Plan、步骤状态和最近错误派生只读“工作记事板”，在模型
+   步骤前复述目标、当前步骤和 Todo；Turn 结束后不跨任务保留派生 scratchpad，只保留
+   Conversation 的有界消息、结果摘要和可恢复引用。长期事实仍归 Agent Pack、
+   Artifact 和业务数据所有。
+
+“清理 Context”因此不是删除历史或长期记忆，而是释放当前 Turn 的派生工作区。完整
+错误堆栈不会反复进入模型，只保留安全错误码、首行摘要和 retryable 状态；原始诊断仍
+留在运行记录中供用户查看。对 OpenAI 与阿里云等兼容端点，运行时继续使用服务端工具
+绑定，不依赖 Provider 特有的 logits mask 或原生 compaction，保持可移植性。

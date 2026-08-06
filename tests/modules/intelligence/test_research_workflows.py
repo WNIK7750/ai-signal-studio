@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import update
+
 from ai_signal_api.capabilities.registry import build_capability_executor
+from ai_signal_api.models import RawItemModel
 from ai_signal_api.modules.intelligence.agent.schemas import ResearchInput
 from ai_signal_api.schemas import ExecutionContext
 
@@ -107,5 +112,41 @@ def test_trend_brief_includes_representatives_counterexample_and_gaps(
         assert result.trends[0].information_ids
         assert result.counterexamples
         assert result.coverage_gaps
+    finally:
+        session.close()
+
+
+def test_research_backfills_empty_exact_window_from_saved_recent_evidence(
+    client,
+) -> None:
+    session, executor = _executor_with_information(client)
+    try:
+        session.execute(
+            update(RawItemModel).values(
+                published_at=(
+                    datetime.now(timezone.utc) - timedelta(hours=48)
+                )
+            )
+        )
+        session.commit()
+        result = executor.execute(
+            "research.recommend",
+            ResearchInput(
+                topic="AI",
+                lookback_hours=24,
+                fallback_lookback_hours=72,
+                allow_workspace_backfill=True,
+                limit=3,
+            ),
+            ExecutionContext(
+                request_id="research-backfill",
+                actor_type="internal_agent",
+            ),
+        )
+
+        assert len(result.items) == 3
+        assert result.requested_item_count == 0
+        assert result.effective_lookback_hours == 72
+        assert len(result.backfilled_information_ids) == 3
     finally:
         session.close()

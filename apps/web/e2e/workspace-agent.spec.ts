@@ -16,8 +16,10 @@ test("agent conversations can be renamed, pinned, archived, deleted, and restore
   await workbar.getByRole("button", { name: "新建对话" }).click();
   let activeRow = workbar.locator(".agent-conversation-item.is-active");
   await activeRow.getByRole("button", { name: /^重命名/ }).click();
-  await activeRow.getByRole("textbox", { name: "会话名称" }).fill(conversationA);
-  await activeRow.getByRole("button", { name: "保存名称" }).click();
+  await workbar
+    .getByRole("textbox", { name: "会话名称" })
+    .fill(conversationA);
+  await workbar.getByRole("button", { name: "保存名称" }).click();
   await expect(workbar.getByText(conversationA, { exact: true })).toBeVisible();
 
   const composer = page.getByPlaceholder("向 Workspace Agent 发送消息…");
@@ -25,8 +27,10 @@ test("agent conversations can be renamed, pinned, archived, deleted, and restore
   await workbar.getByRole("button", { name: "新建对话" }).click();
   activeRow = workbar.locator(".agent-conversation-item.is-active");
   await activeRow.getByRole("button", { name: /^重命名/ }).click();
-  await activeRow.getByRole("textbox", { name: "会话名称" }).fill(conversationB);
-  await activeRow.getByRole("button", { name: "保存名称" }).click();
+  await workbar
+    .getByRole("textbox", { name: "会话名称" })
+    .fill(conversationB);
+  await workbar.getByRole("button", { name: "保存名称" }).click();
   await composer.fill(draftB);
 
   await workbar.getByText(conversationA, { exact: true }).click();
@@ -79,8 +83,12 @@ test("agent collection completes and the conversation survives reload", async ({
 
   await expect(page.getByText(prompt, { exact: true })).toBeVisible();
   await expect(page.getByText(/采集完成/)).toBeVisible();
-  await expect(page.getByText("采集 AI 信息", { exact: true })).toBeVisible();
-  await expect(page.getByText("已完成", { exact: true })).toBeVisible();
+  const collectionCapability = page
+    .locator(".message-capability")
+    .filter({ hasText: "采集 AI 信息" })
+    .last();
+  await expect(collectionCapability).toBeVisible();
+  await expect(collectionCapability.locator("small")).toHaveText("已完成");
   const messageCount = await page.locator(".message").count();
   expect(messageCount).toBeGreaterThanOrEqual(2);
 
@@ -88,7 +96,12 @@ test("agent collection completes and the conversation survives reload", async ({
 
   await expect(page.getByText(prompt, { exact: true })).toHaveCount(1);
   await expect(page.getByText(/采集完成/)).toBeVisible();
-  await expect(page.getByText("采集 AI 信息", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .locator(".message-capability")
+      .filter({ hasText: "采集 AI 信息" })
+      .last(),
+  ).toBeVisible();
   await expect(page.locator(".message")).toHaveCount(messageCount);
 
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -103,12 +116,12 @@ test("agent collection completes and the conversation survives reload", async ({
   expect(browserMessages).toEqual([]);
 });
 
-test("agent turn streams progress, recommendations, partial state, and deep links", async ({
+test("original complex prompts stream recommendations, synthesis, and deep links", async ({
   page,
 }) => {
   await page.goto("/agent");
   const prompt =
-    "收集最近 24 小时的 AI 信息，并从中推荐 5 条最值得看的 Agent 相关内容。";
+    "你好，请你帮我收集最近24小时的热点AI内容，并选出其中影响力最大的三个，给我分析总结";
 
   await page.getByPlaceholder("向 Workspace Agent 发送消息…").fill(prompt);
   await page.getByRole("button", { name: "发送" }).click();
@@ -117,15 +130,27 @@ test("agent turn streams progress, recommendations, partial state, and deep link
   await expect(
     page.getByText("已接收，正在规划…", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText(/总耗时 \d/)).toBeVisible();
+  const currentProgress = page.getByLabel("Agent 运行进度").last();
+  await expect(currentProgress.getByText(/总耗时 \d/)).toBeVisible();
   await expect(
-    page.getByLabel("Agent 运行进度").locator("header strong"),
+    currentProgress.locator("header strong"),
   ).toHaveText(/已完成|部分完成/);
   await expect(page.locator(".agent-signal-preview")).toHaveCount(3);
+  await expect(page.locator(".agent-trend-summary")).toHaveCount(1);
 
   const firstSignal = page.locator(".agent-signal-preview").first();
   const href = await firstSignal.getByRole("link").getAttribute("href");
   expect(href).toContain("/timeline?focus=info_");
   await firstSignal.getByRole("link").click();
   await expect(page).toHaveURL(/\/timeline\?focus=info_/);
+
+  await page.goto("/agent");
+  const followUp =
+    "那么请你就目前收集的三天内的热点AI内容，并选出其中影响力最大的三个，给我分析总结";
+  await page.getByPlaceholder("向 Workspace Agent 发送消息…").fill(followUp);
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect(page.getByText(followUp, { exact: true })).toBeVisible();
+  await expect(page.locator(".agent-trend-summary")).toHaveCount(2);
+  await expect(page.locator(".agent-signal-preview")).toHaveCount(6);
 });

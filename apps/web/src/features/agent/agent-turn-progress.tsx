@@ -32,6 +32,12 @@ export function AgentTurnProgress({
       .filter((event) => event.type === "tool.completed")
       .map((event) => event.step_id),
   );
+  const outcomes = new Map<string, string>();
+  for (const event of events) {
+    if (event.type === "step.outcome" && event.step_id) {
+      outcomes.set(event.step_id, String(event.data.status ?? ""));
+    }
+  }
   const activeStep = [...events]
     .reverse()
     .find((event) => event.type === "step.started")?.step_id;
@@ -63,8 +69,13 @@ export function AgentTurnProgress({
           <summary>执行计划 · {plan.steps.length} 步</summary>
           <ol>
             {plan.steps.map((step) => {
-              const stepStatus = completed.has(step.step_id)
-                ? "已完成"
+              const outcome = outcomes.get(step.step_id);
+              const stepStatus = outcome === "partial"
+                ? "部分完成"
+                : outcome === "failed"
+                  ? "未完成"
+                  : outcome === "completed" || completed.has(step.step_id)
+                    ? "已完成"
                 : activeStep === step.step_id
                   ? "进行中"
                   : "等待";

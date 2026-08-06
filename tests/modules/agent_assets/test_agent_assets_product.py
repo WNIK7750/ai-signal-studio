@@ -3,9 +3,12 @@ from __future__ import annotations
 import base64
 from io import BytesIO
 import json
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi.testclient import TestClient
+
+from ai_signal_api.modules.agent_assets.agent_packs import AgentPackService
 
 
 def _pack_zip(*, version: str = "1.0.0", unsafe: bool = False) -> str:
@@ -103,6 +106,37 @@ def test_agent_pack_import_is_atomic_and_searchable(
             "agent.yaml",
             "memory/preferences.md",
         ]
+
+
+def test_agent_pack_import_preserves_a_conflicting_immutable_directory(
+    client: TestClient,
+    tmp_path: Path,
+) -> None:
+    encoded = _pack_zip(version="9.9.0")
+    with ZipFile(BytesIO(base64.b64decode(encoded))) as archive:
+        files = {
+            item.filename: archive.read(item)
+            for item in archive.infolist()
+            if not item.is_dir()
+        }
+    digest = AgentPackService._content_digest(files)
+    root = tmp_path / "agent-packs"
+    conflicting = root / "ai-editor" / f"9.9.0-{digest[:12]}"
+    conflicting.mkdir(parents=True)
+    marker = conflicting / "preserve-me.txt"
+    marker.write_text("local data must not be overwritten", encoding="utf-8")
+
+    with client.app.state.session_factory() as session:
+        imported = AgentPackService(session, root).import_base64(encoded)
+
+    installed = Path(imported.storage_uri)
+    assert installed.name == f"9.9.0-{digest}"
+    assert AgentPackService._content_digest(
+        AgentPackService._read_files(installed)
+    ) == digest
+    assert marker.read_text(encoding="utf-8") == (
+        "local data must not be overwritten"
+    )
 
 
 def test_artifact_upload_deduplicates_and_returns_a_reference(

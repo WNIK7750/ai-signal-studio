@@ -107,6 +107,23 @@ class ArtifactService:
             raise LookupError("ARTIFACT_NOT_FOUND")
         return artifact
 
+    def image_data_url(self, artifact_id: str) -> str:
+        """Resolve a validated image handle for a transient model request."""
+
+        artifact = self.get(artifact_id)
+        if not artifact.media_type.startswith("image/"):
+            raise ArtifactError("ARTIFACT_NOT_IMAGE")
+        path = Path(artifact.storage_uri).resolve()
+        if not path.is_relative_to(self.root) or not path.is_file():
+            raise ArtifactError("ARTIFACT_PATH_UNSAFE")
+        content = path.read_bytes()
+        if hashlib.sha256(content).hexdigest() != artifact.sha256:
+            raise ArtifactError("ARTIFACT_DIGEST_MISMATCH")
+        return (
+            f"data:{artifact.media_type};base64,"
+            f"{base64.b64encode(content).decode('ascii')}"
+        )
+
     def list(self) -> list[ArtifactModel]:
         return list(
             self.session.scalars(

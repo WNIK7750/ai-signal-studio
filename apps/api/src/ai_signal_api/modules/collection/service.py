@@ -328,6 +328,75 @@ class CollectionService:
         self.session.commit()
         return run
 
+    def ingest_discovered_items(
+        self,
+        source_items: list[tuple[SourceConfigModel, CollectedItem]],
+        *,
+        idempotency_key: str | None,
+        trigger_type: str,
+    ) -> tuple[CollectionRunModel, list[str]]:
+        if idempotency_key:
+            existing = self.session.scalar(
+                select(CollectionRunModel).where(
+                    CollectionRunModel.idempotency_key == idempotency_key
+                )
+            )
+            if existing is not None:
+                information_ids = list(
+                    self.session.scalars(
+                        select(IntelligenceItemModel.id)
+                        .join(
+                            RawItemModel,
+                            RawItemModel.id
+                            == IntelligenceItemModel.raw_item_id,
+                        )
+                        .where(RawItemModel.run_id == existing.id)
+                    )
+                )
+                return existing, information_ids
+        source_ids = list(
+            dict.fromkeys(source.id for source, _item in source_items)
+        )
+        run = CollectionRunModel(
+            status="running",
+            coverage_status="met",
+            trigger_type=trigger_type,
+            idempotency_key=idempotency_key,
+            source_ids=source_ids,
+            started_at=datetime.now(timezone.utc),
+        )
+        self.session.add(run)
+        self.session.commit()
+        information_ids: list[str] = []
+        for source, item in source_items:
+            if self._persist_item(run, source, item):
+                information = self.session.scalar(
+                    select(IntelligenceItemModel)
+                    .join(
+                        RawItemModel,
+                        RawItemModel.id
+                        == IntelligenceItemModel.raw_item_id,
+                    )
+                    .where(
+                        RawItemModel.canonical_url
+                        == canonicalize_url(item.url)
+                    )
+                )
+                if information is not None:
+                    information_ids.append(information.id)
+        run.items_collected = len(source_items)
+        run.items_added = len(information_ids)
+        run.funnel_counts = {
+            "fetched": len(source_items),
+            "matched": len(source_items),
+            "deduplicated": len(information_ids),
+            "selected": len(information_ids),
+        }
+        run.status = "completed"
+        run.completed_at = datetime.now(timezone.utc)
+        self.session.commit()
+        return run, information_ids
+
     def resolve_task_sources(
         self,
         config: TaskConfig,

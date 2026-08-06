@@ -12,12 +12,27 @@ from pydantic import ValidationError
 
 from ai_signal_api.agent_runtime.contracts import AgentPlan
 from ai_signal_api.agent_runtime.graph import WorkspaceGraphRunner
-from ai_signal_api.agent_runtime.harness import RecoveryScanner
+from ai_signal_api.agent_runtime.harness import (
+    RecoveryScanner,
+    _capability_call_status,
+    _execution_error_envelope,
+)
 from ai_signal_api.capabilities.registry import build_capability_executor
 from ai_signal_api.models import AgentTurnModel
+from ai_signal_api.modules.models.service import ModelConfigurationError
 
 
 def _plan(*, clarification: bool = False, approval: bool = False) -> dict[str, Any]:
+    capability_id = (
+        "information.state.update"
+        if approval
+        else "intelligence.timeline.query"
+    )
+    arguments = (
+        {"item_id": "info_requires_approval", "archived": True}
+        if approval
+        else {"limit": 3}
+    )
     return {
         "objective": "执行受控研究",
         "constraints": {
@@ -34,8 +49,8 @@ def _plan(*, clarification: bool = False, approval: bool = False) -> dict[str, A
                 "goal": "查询已保存信息",
                 "kind": "capability",
                 "domains": ["intelligence"],
-                "capability_id": "intelligence.timeline.query",
-                "arguments": {"limit": 3},
+                "capability_id": capability_id,
+                "arguments": arguments,
                 "dependencies": [],
                 "success_criteria": "返回可引用信息",
                 "acceptance_policy": {
@@ -127,6 +142,29 @@ def test_agent_plan_accepts_valid_forward_dependency_and_rejects_cycle() -> None
         raise AssertionError("cyclic plan should be rejected")
 
 
+def test_execution_errors_are_specific_without_echoing_provider_payloads() -> None:
+    configuration_error = _execution_error_envelope(
+        ModelConfigurationError("MODEL-001")
+    )
+    provider_error = _execution_error_envelope(
+        RuntimeError(
+            "tool_choice required is unsupported in thinking mode "
+            "with test-only-secret"
+        )
+    )
+
+    assert configuration_error.code == "MODEL-001"
+    assert configuration_error.message == "未找到指定模型"
+    assert provider_error.code == "PROVIDER-006"
+    assert "思考模式" in provider_error.message
+    assert "test-only-secret" not in provider_error.message
+
+
+def test_unexecuted_capability_is_not_reported_as_completed() -> None:
+    assert _capability_call_status(None) == "skipped"
+    assert _capability_call_status({"status": "completed"}) == "completed"
+
+
 def test_clarification_interrupt_resumes_same_thread(client) -> None:
     runner = _runner(client, _plan(clarification=True))
     try:
@@ -191,6 +229,29 @@ def test_recovery_scanner_requeues_only_expired_running_turn(client) -> None:
         assert recovered == [turn.id]
         assert turn.status == "queued"
         assert turn.lease_owner is None
+
+
+def test_recovery_scanner_rejects_incomplete_0_4_checkpoint(client) -> None:
+    conversation = client.post("/api/agent-conversations", json={}).json()
+    created = client.post(
+        f"/api/agent-conversations/{conversation['id']}/turns",
+        json={
+            "message": "执行查询",
+            "client_message_id": "recovery-version-boundary",
+        },
+    ).json()
+    with client.app.state.session_factory() as session:
+        turn = session.get(AgentTurnModel, created["id"])
+        turn.status = "running"
+        turn.workflow_version = "0.4.0"
+        turn.lease_owner = "old-worker"
+        turn.lease_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        session.commit()
+
+        assert RecoveryScanner(session).scan() == []
+        session.refresh(turn)
+        assert turn.status == "failed"
+        assert turn.error["code"] == "AGENT_CHECKPOINT_VERSION_INCOMPATIBLE"
 
 
 def test_cancellation_checker_stops_before_next_step(client) -> None:

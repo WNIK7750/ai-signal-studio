@@ -6,6 +6,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+WORKFLOW_VERSION = "0.7.0"
+
+
 TurnStatus = Literal[
     "queued",
     "running",
@@ -15,6 +18,47 @@ TurnStatus = Literal[
     "partial",
     "failed",
     "cancelled",
+]
+
+CapabilityId = Literal[
+    "collection.run.start",
+    "web.search.collect",
+    "intelligence.timeline.query",
+    "intelligence.search",
+    "intelligence.recommend",
+    "research.filter",
+    "research.recommend",
+    "research.match_requirements",
+    "research.compare",
+    "research.trend_brief",
+    "research.coverage_gap",
+    "agent_pack.search",
+    "artifact.search",
+    "poster.card.update",
+    "poster.card.render",
+    "poster.draft.generate",
+    "review.batch.submit",
+    "task.run.start",
+    "task.draft.propose",
+    "source.list",
+    "source.test",
+    "source.update",
+    "task.list",
+    "task.get",
+    "task.update",
+    "run.list",
+    "run.get",
+    "card.list",
+    "card.get",
+    "information.state.update",
+    "model.list",
+    "model.select",
+    "conversation.list",
+    "conversation.update",
+    "conversation.archive",
+    "conversation.restore",
+    "appearance.set",
+    "agent.message.complete",
 ]
 
 
@@ -43,6 +87,7 @@ class EvidenceRef(BaseModel):
 class AgentResultBlock(BaseModel):
     block_id: str
     type: Literal[
+        "result_summary",
         "plan_summary",
         "signal_preview",
         "collection_summary",
@@ -54,9 +99,23 @@ class AgentResultBlock(BaseModel):
         "artifact_list",
         "partial_failure",
         "navigation_action",
+        "model_response",
     ]
     title: str
     data: dict[str, Any]
+
+
+class ModelReasoningOutput(BaseModel):
+    status: Literal["completed"] = "completed"
+    content: str = Field(min_length=1, max_length=8000)
+    basis: Literal[
+        "conversation_context",
+        "tool_evidence",
+        "mixed",
+    ]
+    evidence_boundary: str = Field(min_length=1, max_length=1000)
+    information_ids: list[str] = Field(default_factory=list, max_length=20)
+    effective_model_id: str = Field(min_length=1, max_length=200)
 
 
 class AcceptancePolicy(BaseModel):
@@ -64,6 +123,8 @@ class AcceptancePolicy(BaseModel):
         "information_results.v1",
         "capability_effect.v1",
         "artifact_created.v1",
+        "synthesis_grounded.v1",
+        "contextual_response.v1",
     ]
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -72,9 +133,21 @@ class PlanStep(BaseModel):
     step_id: str
     title: str
     goal: str
-    kind: Literal["capability", "domain_agent", "domain_workflow"]
-    domains: list[str] = Field(min_length=1, max_length=3)
-    capability_id: str
+    kind: Literal[
+        "capability",
+        "domain_agent",
+        "domain_workflow",
+        "model_reasoning",
+    ]
+    domains: list[str] = Field(default_factory=list, max_length=3)
+    capability_id: CapabilityId | None = Field(
+        default=None,
+        description=(
+            "Exact registered capability ID from this enum; never invent, "
+            "translate, abbreviate, or prefix an ID. It may be omitted only "
+            "for a model_reasoning step."
+        )
+    )
     arguments: dict[str, Any] = Field(default_factory=dict)
     dependencies: list[str] = Field(default_factory=list)
     success_criteria: str
@@ -86,6 +159,32 @@ class PlanStep(BaseModel):
         "continue_independent",
         "retry_then_continue",
     ] = "stop_dependents"
+    satisfies: list[str] = Field(
+        default_factory=list,
+        max_length=6,
+        description=(
+            "Canonical goal deliverables completed by this step. Research "
+            "uses recommendations, trend_summary, and evidence."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_execution_mode(self) -> PlanStep:
+        if self.kind == "model_reasoning":
+            if self.capability_id is not None:
+                raise ValueError("AGENT_PLAN_MODEL_REASONING_HAS_CAPABILITY")
+            if self.side_effect != "read":
+                raise ValueError("AGENT_PLAN_MODEL_REASONING_MUST_BE_READ")
+            if self.acceptance_policy.id != "contextual_response.v1":
+                raise ValueError(
+                    "AGENT_PLAN_MODEL_REASONING_ACCEPTANCE_INVALID"
+                )
+            return self
+        if not self.domains:
+            raise ValueError("AGENT_PLAN_DOMAIN_REQUIRED")
+        if self.capability_id is None:
+            raise ValueError("AGENT_PLAN_CAPABILITY_REQUIRED")
+        return self
 
 
 class AgentPlan(BaseModel):
@@ -130,6 +229,135 @@ class AgentPlan(BaseModel):
         return self
 
 
+class GoalTimeWindow(BaseModel):
+    lookback_hours: int = Field(ge=1, le=24 * 365)
+    published_from: datetime | None = None
+    published_to: datetime | None = None
+
+
+class AgentGoalSpec(BaseModel):
+    operation_mode: Literal[
+        "direct",
+        "collect_then_analyze",
+        "analyze_existing",
+        "execute",
+    ]
+    topic: str = Field(default="AI", min_length=1, max_length=120)
+    time_window: GoalTimeWindow
+    max_items: int = Field(
+        ge=1,
+        le=20,
+        description="Exact requested result count; Chinese 三个 means 3.",
+    )
+    ranking_criterion: Literal["impact", "relevance", "recency"]
+    deliverables: list[str] = Field(
+        min_length=1,
+        max_length=8,
+        description=(
+            "Canonical deliverable IDs. Complex research must use exactly "
+            "recommendations, trend_summary, and evidence."
+        ),
+    )
+    use_existing: bool = True
+    requires_collection: bool = False
+    requires_synthesis: bool = False
+
+
+class AgentPlanningOutput(BaseModel):
+    goal: AgentGoalSpec
+    plan: AgentPlan
+
+
+def validate_goal_plan_coverage(
+    goal: AgentGoalSpec,
+    plan: AgentPlan,
+) -> list[str]:
+    """Return stable, model-actionable gaps between a goal and its plan."""
+
+    gaps: list[str] = []
+    capabilities = [step.capability_id for step in plan.steps]
+    required: list[str] = []
+    if goal.operation_mode in {
+        "collect_then_analyze",
+        "analyze_existing",
+    }:
+        required.append("intelligence.search")
+        if goal.requires_collection:
+            required.insert(0, "collection.run.start")
+            required.insert(2, "web.search.collect")
+        if "recommendations" in goal.deliverables:
+            required.append("research.recommend")
+        if goal.requires_synthesis or "trend_summary" in goal.deliverables:
+            required.append("research.trend_brief")
+    for capability_id in required:
+        if capability_id not in capabilities:
+            gaps.append(f"missing_capability:{capability_id}")
+    capability_steps = {
+        step.capability_id: step
+        for step in plan.steps
+    }
+    for dependency_id, capability_id in zip(required, required[1:]):
+        dependency = capability_steps.get(dependency_id)
+        step = capability_steps.get(capability_id)
+        if (
+            dependency is not None
+            and step is not None
+            and dependency.step_id not in step.dependencies
+        ):
+            gaps.append(
+                f"missing_dependency:{capability_id}:{dependency_id}"
+            )
+
+    covered = {
+        deliverable
+        for step in plan.steps
+        for deliverable in step.satisfies
+    }
+    for deliverable in goal.deliverables:
+        if deliverable not in covered:
+            gaps.append(f"uncovered_deliverable:{deliverable}")
+
+    constraints = plan.constraints
+    if goal.operation_mode in {
+        "collect_then_analyze",
+        "analyze_existing",
+    }:
+        if int(constraints.get("lookback_hours", 0)) != (
+            goal.time_window.lookback_hours
+        ):
+            gaps.append("constraint_mismatch:lookback_hours")
+        if int(constraints.get("max_items", 0)) != goal.max_items:
+            gaps.append("constraint_mismatch:max_items")
+        if constraints.get("ranking_criterion") != goal.ranking_criterion:
+            gaps.append("constraint_mismatch:ranking_criterion")
+
+    for step in plan.steps:
+        if step.capability_id not in {
+            "intelligence.search",
+            "web.search.collect",
+            "research.recommend",
+            "research.trend_brief",
+        }:
+            continue
+        arguments = step.arguments
+        if arguments and int(
+            arguments.get(
+                "lookback_hours",
+                goal.time_window.lookback_hours,
+            )
+        ) != goal.time_window.lookback_hours:
+            gaps.append(f"argument_mismatch:{step.step_id}:lookback_hours")
+        if step.capability_id in {
+            "research.recommend",
+            "research.trend_brief",
+        }:
+            if int(arguments.get("limit", 0)) != goal.max_items:
+                gaps.append(f"argument_mismatch:{step.step_id}:limit")
+            if arguments.get("rank_by") != goal.ranking_criterion:
+                gaps.append(f"argument_mismatch:{step.step_id}:rank_by")
+    return list(dict.fromkeys(gaps))
+
+
 class ActionEnvelope(BaseModel):
     turn_id: str
     step_id: str
@@ -143,22 +371,27 @@ class ActionEnvelope(BaseModel):
 
 
 class ExecutionManifest(BaseModel):
-    workflow_version: str = "0.4.0"
-    state_schema_version: str = "1.0.0"
-    plan_schema_version: str = "1.0.0"
-    event_schema_version: str = "1.0.0"
+    workflow_version: str = WORKFLOW_VERSION
+    state_schema_version: str = "1.2.0"
+    plan_schema_version: str = "1.2.0"
+    event_schema_version: str = "1.2.0"
     base_prompt_version: str = "base-prompt@1.0.0"
     domain_pack_versions: dict[str, str] = Field(default_factory=dict)
     tool_catalog_version: str = "1"
+    requested_model_id: str | None = None
+    effective_model_id: str | None = None
     model_config_ref: str
     capability_snapshot_digest: str
+    artifact_ids: list[str] = Field(default_factory=list, max_length=20)
 
 
 class AgentTurnResult(BaseModel):
     status: Literal["complete", "partial", "failed", "cancelled"]
     message: str
+    goal: AgentGoalSpec | None = None
     plan: AgentPlan
     result_blocks: list[AgentResultBlock] = Field(default_factory=list)
+    capability_results: dict[str, dict[str, Any]] = Field(default_factory=dict)
     evidence: list[EvidenceRef] = Field(default_factory=list)
     business_run_ids: list[str] = Field(default_factory=list)
     errors: list[ErrorEnvelope] = Field(default_factory=list)
@@ -170,6 +403,7 @@ class AgentTurnCreate(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     client_message_id: str = Field(min_length=1, max_length=100)
     model_id: str | None = None
+    artifact_ids: list[str] = Field(default_factory=list, max_length=20)
 
 
 class AgentTurnResume(BaseModel):
@@ -193,6 +427,9 @@ class AgentTurnRead(BaseModel):
     status: TurnStatus
     message: str
     workflow_version: str
+    requested_model_id: str | None = None
+    effective_model_id: str | None = None
+    manifest: dict[str, Any] = Field(default_factory=dict)
     plan: dict[str, Any]
     result: dict[str, Any]
     error: dict[str, Any] | None
@@ -200,6 +437,16 @@ class AgentTurnRead(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+
+    @model_validator(mode="after")
+    def project_model_ids(self) -> AgentTurnRead:
+        self.requested_model_id = self.requested_model_id or self.manifest.get(
+            "requested_model_id"
+        )
+        self.effective_model_id = self.effective_model_id or self.manifest.get(
+            "effective_model_id"
+        )
+        return self
 
 
 class AgentTurnEventRead(BaseModel):

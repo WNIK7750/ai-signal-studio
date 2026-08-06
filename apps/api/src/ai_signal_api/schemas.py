@@ -15,7 +15,7 @@ from pydantic import (
 )
 
 
-SourceKind = Literal["demo", "rss", "github_releases"]
+SourceKind = Literal["demo", "rss", "github_releases", "web_search"]
 Priority = Literal["important", "watch", "normal"]
 
 
@@ -35,6 +35,10 @@ class SourceCreate(BaseModel):
             self.config.get("repository", "")
         ).strip():
             raise ValueError("SOURCE_CONFIG_REPOSITORY_REQUIRED")
+        if self.kind == "web_search" and not str(
+            self.config.get("origin", "")
+        ).strip():
+            raise ValueError("SOURCE_CONFIG_ORIGIN_REQUIRED")
         return self
 
 
@@ -372,6 +376,15 @@ class ModelConfigRead(BaseModel):
     output_token_limit: int | None
     enabled: bool
     is_default: bool
+    connection_status: Literal[
+        "pending",
+        "healthy",
+        "needs_retest",
+        "error",
+        "not_applicable",
+    ]
+    connection_checked_at: datetime | None
+    connection_error_code: str | None
     created_at: datetime
     updated_at: datetime
 

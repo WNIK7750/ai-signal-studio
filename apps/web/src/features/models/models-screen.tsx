@@ -31,6 +31,18 @@ function compactTokens(value: number | null) {
   return `${Math.round(value / 1000)}K`;
 }
 
+function connectionLabel(model: ModelConfig) {
+  if (model.connection_status === "healthy") return "连接已验证";
+  if (model.connection_status === "pending") return "待检测";
+  if (model.connection_status === "needs_retest") return "建议复检";
+  if (model.connection_status === "error") {
+    return model.connection_error_code
+      ? `检测失败 · ${model.connection_error_code}`
+      : "检测失败";
+  }
+  return "";
+}
+
 export function ModelsScreen() {
   const queryClient = useQueryClient();
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
@@ -94,6 +106,35 @@ export function ModelsScreen() {
     void queryClient.invalidateQueries({ queryKey: ["providers"] });
   }
 
+  const testModel = useMutation({
+    mutationFn: api.testModel,
+    onMutate: (modelId) => {
+      setError("");
+      setConnectionNotice({
+        modelId,
+        message: "正在测试连接…",
+        ok: true,
+      });
+    },
+    onSuccess: (result, modelId) => {
+      setConnectionNotice({
+        modelId,
+        message: result.message,
+        ok: true,
+      });
+      refreshModels();
+    },
+    onError: (reason, modelId) => {
+      setConnectionNotice({
+        modelId,
+        message: reason instanceof Error
+          ? reason.message
+          : "MODEL-005（模型服务调用失败）",
+        ok: false,
+      });
+      refreshModels();
+    },
+  });
   const createModel = useMutation({
     mutationFn: api.createModel,
     onSuccess: () => {
@@ -153,34 +194,6 @@ export function ModelsScreen() {
           : "SYS-001（切换模型失败）",
       ),
   });
-  const testModel = useMutation({
-    mutationFn: api.testModel,
-    onMutate: (modelId) => {
-      setError("");
-      setConnectionNotice({
-        modelId,
-        message: "正在测试连接…",
-        ok: true,
-      });
-    },
-    onSuccess: (result, modelId) => {
-      setConnectionNotice({
-        modelId,
-        message: result.message,
-        ok: true,
-      });
-    },
-    onError: (reason, modelId) => {
-      setConnectionNotice({
-        modelId,
-        message: reason instanceof Error
-          ? reason.message
-          : "MODEL-005（模型服务调用失败）",
-        ok: false,
-      });
-    },
-  });
-
   function changeProvider(nextId: string) {
     const preset = findProviderPreset(nextId);
     const provider = providers.data?.find((item) => item.id === nextId);
@@ -303,6 +316,21 @@ export function ModelsScreen() {
                       role="status"
                     >
                       {connectionNotice.message}
+                    </span>
+                  )}
+                  {connectionNotice?.modelId !== model.id
+                    && model.provider !== "heuristic"
+                    && connectionLabel(model) && (
+                    <span
+                      className={`model-capability-tag ${
+                        model.connection_status === "healthy"
+                          ? "success"
+                          : model.connection_status === "pending"
+                            ? ""
+                            : "warning"
+                      }`}
+                    >
+                      {connectionLabel(model)}
                     </span>
                   )}
                 </div>

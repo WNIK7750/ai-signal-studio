@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
 
-test("create, manually switch, and validate an image model", async ({
+test("create, manually switch, and track connection state for an image model", async ({
   page,
 }) => {
   const browserMessages: string[] = [];
@@ -53,6 +53,7 @@ test("create, manually switch, and validate an image model", async ({
   const modelRow = page.locator(".model-row").filter({ hasText: modelName });
   await expect(modelRow).toContainText("当前默认");
   await expect(modelRow).toContainText("密钥已配置");
+  await expect(modelRow).toContainText("待检测");
   await expect(
     page.getByRole("button", { name: `测试模型 ${modelName}` }),
   ).toBeVisible();
@@ -78,6 +79,7 @@ test("create, manually switch, and validate an image model", async ({
     .locator(".model-row")
     .filter({ hasText: editedModelName });
   await expect(editedModelRow).toContainText("最大输出 32K");
+  await expect(editedModelRow).toContainText("待检测");
   await page.screenshot({
     path: path.join(
       process.env.TEMP ?? ".",

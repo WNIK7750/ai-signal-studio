@@ -16,6 +16,45 @@ capabilities:
       mcp_tool: true
       a2a_skill: true
 
+  - id: web.search.collect
+    version: 1.0.0
+    title: Search the web conditionally, cache pages, and normalize evidence
+    input_schema: web-search-collect-input-v1
+    output_schema: web-search-collect-result-v1
+    side_effect: external
+    risk_level: low
+    approval: never
+    required_scopes: [collection:write]
+    dependencies: [intelligence.search]
+    cache: ttl_query_and_page_cache
+    external_content: untrusted
+    interfaces:
+      rest: false
+      langchain_tool: true
+      mcp_tool: false
+      a2a_skill: false
+
+  - id: intelligence.search
+    version: 1.0.0
+    title: Search pending, intelligence, archived, and card stages once
+    input_schema: intelligence-search-input-v1
+    output_schema: intelligence-search-result-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: []
+    retrieval:
+      lexical: sqlite_fts5_bm25
+      short_query_fallback: substring
+      fusion: reciprocal_rank_fusion
+      near_duplicate_grouping: simhash64
+    interfaces:
+      rest: false
+      langchain_tool: true
+      mcp_tool: false
+      a2a_skill: false
+
   - id: intelligence.timeline.query
     version: 1.0.0
     title: Query intelligence timeline
@@ -47,6 +86,92 @@ capabilities:
       langchain_tool: true
       mcp_tool: false
       a2a_skill: false
+
+  - id: research.filter
+    version: 1.1.0
+    title: Filter saved intelligence with exact time bounds
+    input_schema: research-input-v1.1
+    output_schema: research-result-v1.1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [intelligence.timeline.query]
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: research.recommend
+    version: 1.2.0
+    title: Rank saved intelligence with explainable impact signals
+    input_schema: research-input-v1.1
+    output_schema: research-result-v1.1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [intelligence.search]
+    agent_execution: bounded_domain_agent
+    model_enrichment_schema: research-analysis-synthesis-v1.2
+    shares_synthesis_with: research.trend_brief
+    model_output_repair:
+      structured_payload_sources: [parsed, tool_calls.arguments, content_json]
+      recommendation_fill: bounded_capability_ranking_only
+      citation_grounding: selected_information_ids_only
+      additional_model_calls: 0
+    saved_evidence_backfill:
+      exact_window_first: true
+      disclose_effective_window: true
+      relabel_background_as_exact_window: false
+    generated_language: zh-CN
+    preserve_source_language: true
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: research.match_requirements
+    version: 1.1.0
+    title: Match saved intelligence against explicit requirements
+    input_schema: research-input-v1.1
+    output_schema: research-result-v1.1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [intelligence.timeline.query]
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: research.compare
+    version: 1.1.0
+    title: Compare saved intelligence with grounded facts
+    input_schema: research-input-v1.1
+    output_schema: research-result-v1.1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [intelligence.timeline.query]
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: research.trend_brief
+    version: 1.1.0
+    title: Synthesize selected intelligence into a grounded trend brief
+    input_schema: research-input-v1.1
+    output_schema: trend-synthesis-v1.1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [research.recommend]
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: research.coverage_gap
+    version: 1.1.0
+    title: Identify evidence coverage gaps
+    input_schema: research-input-v1.1
+    output_schema: research-result-v1.1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [intelligence.timeline.query]
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}
 
   - id: task.run.start
     version: 1.0.0

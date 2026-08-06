@@ -266,6 +266,7 @@ export function TimelineScreen() {
           ["", "全部来源"],
           ["rss", "RSS"],
           ["github_releases", "GitHub Releases"],
+          ["web_search", "网络搜索"],
           ["demo", "示例来源"],
         ].map(([value, label]) => (
           <label key={value} className="radio-row">

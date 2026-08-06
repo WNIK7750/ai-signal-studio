@@ -123,6 +123,40 @@ def test_saved_model_can_test_its_real_provider_request(
     assert captured["authorization"] == "Bearer sk-vision-secret"
     assert captured["url"] == "https://api.example.com/v1/chat/completions"
     assert captured["body"]["model"] == "vision-model-v1"
+    tested = next(
+        item
+        for item in client.get("/api/models").json()
+        if item["id"] == model["id"]
+    )
+    assert tested["connection_status"] == "healthy"
+    assert tested["connection_checked_at"]
+
+
+def test_connection_is_pending_only_for_new_or_edited_model(
+    client: TestClient,
+) -> None:
+    model = create_vision_model(client)
+    assert model["connection_status"] == "pending"
+    assert model["connection_checked_at"] is None
+
+    selected = client.app.state.model_configuration.select_for_request(
+        model["id"]
+    )
+    assert selected.effective_model.id == model["id"]
+    unchanged = next(
+        item
+        for item in client.get("/api/models").json()
+        if item["id"] == model["id"]
+    )
+    assert unchanged["connection_status"] == "pending"
+
+    response = client.patch(
+        f"/api/models/{model['id']}",
+        json={"name": "视觉模型（已修改）"},
+    )
+    assert response.status_code == 200
+    assert response.json()["connection_status"] == "pending"
+    assert response.json()["connection_checked_at"] is None
 
 
 def test_existing_provider_can_reuse_its_key_for_another_model(

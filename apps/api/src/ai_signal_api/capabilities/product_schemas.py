@@ -6,11 +6,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ai_signal_api.schemas import (
+    AgentTaskDraft,
     AgentConversationPatch,
     AgentConversationSummary,
     CardRead,
     CollectionRunRead,
     ModelConfigRead,
+    ScheduleDraft,
     SourcePatch,
     SourceRead,
     TaskPatch,
@@ -45,6 +47,16 @@ class TaskGetInput(BaseModel):
 
 class TaskPatchCapabilityInput(TaskPatch):
     task_id: str
+
+
+class TaskDraftProposalInput(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class TaskDraftProposalResult(BaseModel):
+    status: Literal["pending_confirmation"] = "pending_confirmation"
+    schedule_draft: ScheduleDraft
+    task_draft: AgentTaskDraft
 
 
 class RunListInput(BaseModel):

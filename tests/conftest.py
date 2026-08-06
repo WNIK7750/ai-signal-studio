@@ -39,6 +39,7 @@ def client(tmp_path) -> Iterator[TestClient]:
             _env_file=None,
             database_url=database_url,
             llm_provider="heuristic",
+            agent_test_mode=True,
             model_config_path=tmp_path / "models.local.json",
             model_secrets_path=tmp_path / "model-secrets.local.json",
             artifact_root=tmp_path / "artifacts",

@@ -847,3 +847,214 @@ Graph Spec、本文、工作流历史和 Figma 节点 `3:304`，没有创建第�
 - E5 外部 Agent Gateway 继续 Deferred。
 
 Git 分支、提交、推送与 Draft PR 仅在 staged 审计通过后更新，不提前写成完成。
+
+## 12. 2026-08-06 复杂任务阻断缺陷重新打开
+
+状态：**P0 Reopened；此前“发布收尾完成”不再代表复杂自然语言 Agent 已验收。**
+
+用户原始场景：
+
+```text
+你好，请你帮我收集最近24小时的热点AI内容，并选出其中影响力最大的三个，给我分析总结
+那么请你就目前收集的三天内的热点AI内容，并选出其中影响力最大的三个，给我分析总结
+```
+
+只读诊断确认：
+
+- 前端关键词规则要求字面量 `Agent`，两条请求因此进入旧 `/api/agent-runs`；
+- 旧 `_run_action()` 匹配“收集”后只执行 `collection.run.start` 并立即返回；
+- 两次实际消息的 `turn_id` 与 `effective_model_id` 均为空，所选模型未参与；
+- 当前信息库存在最近三天候选，失败不是因为缺少数据；
+- 新 Graph 仍缺 Goal Coverage、真实 Conversation Context、Acceptance Policy 验收和跨条目
+  综合分析；
+- 当时的固定 Fake/E2E 提示词恰好包含 `Agent` 与“推荐”，因此测试全绿未覆盖该缺陷。
+
+当前唯一实施入口：
+
+```text
+prompts/02-module-review-agent/02-workspace-agent-complex-task-repair-coding-agent-prompt.md
+```
+
+必须以两条原始提示词建立 TDD，统一自然语言 Runtime，并取得 24h/72h、3 条、影响力
+排序、带引用综合分析和真实流式 ResultBlock 的全栈证据。只删除前端关键词判断或让 Fake
+返回正确计划都不能关闭本缺陷。
+
+本修复预计沿用 N01～N25 主拓扑，但会改变 Context、路由、Planner、Inspector 和结果
+合并契约；实施增量目标 `workflow_version=0.5.0`，必须同步 Graph Spec、追加式历史
+Markdown、Figma 当前图、本文、契约和 Graph/Eval/E2E 测试后才能重新标记完成。
+
+## 13. 2026-08-06 Workspace Agent 0.5.0 复杂任务修复
+
+状态：**代码、确定性全栈与真实模型两轮闭环已通过；Figma 写入仍被外部安全门禁阻塞。**
+
+已落地：
+
+- 前端所有自然语言、纯解释和带 Artifact 的消息默认进入 Turn API；删除
+  `isWorkspaceResearchRequest`，旧 `/agent-runs` 只同步映射同一 Turn；
+- `AgentGoalSpec` 固化 operation mode、24/72 小时时间窗、3 条、impact、deliverables、
+  use existing、collection 与 synthesis 要求；
+- N08 同时验证 DAG、Capability、参数和 Goal Coverage，欠完整计划带 gap 反馈进入有界
+  Replan；
+- Conversation Context 限制为最近 8 条消息摘要和 3 个 prior Turn/Run/Result 引用；
+- 四步链使用精确时间窗、Query 真实候选 ID、可解释颜色/相关性/时间/稳定 ID 排序，
+  `items_added=0` 不阻止后续查询；
+- `research.trend_brief` 返回 overview、key findings、why it matters、differences、
+  uncertainties 和逐 finding `information_ids`；
+- N22 验收真实 ID、来源、站内路径、数量下限和 grounded synthesis；不足时不再无警告
+  complete；
+- `result.block` SSE 携带完整 ResultBlock；UI 增量去重渲染 Plan、采集、推荐、综合、
+  Evidence、局部失败和安全未知类型 fallback；
+- Manifest/Turn 分离 requested/effective model ID，测试 Provider 只能由显式
+  `agent_test_mode` 选择；正常 heuristic 配置不再伪装模型成功；
+- OpenAI 标准兼容端点使用中性 Provider 画像；DashScope 的思考模式参数只位于
+  Provider Adapter。核心 Graph、Goal/Plan、Capability 和 Inspector 不感知厂商；
+- 健康检查公开 `workflow_version`，启动器与 Graph Spec 做版本握手；旧 API 即使返回
+  HTTP 200 也不会再被当前启动器误当作可复用服务。Windows Uvicorn reload 父进程
+  已退出但 multiprocessing 子进程仍持有端口时，可按监听父 PID 安全识别并清理；
+- 未执行的依赖步骤显示为“未执行”，不再因缺少 Capability Result 被默认标为
+  “已完成”；模型配置和已知 Provider 兼容错误显示稳定错误码与安全提示，不回显
+  Provider 原始负载；
+- Capability ID 为机器枚举，Planning Contract 约束四步链每步的 kind、side effect、
+  acceptance policy 和依赖；解析失败使用 `include_raw` 的一次 Schema 修复，禁止
+  无约束 JSON fallback；
+- workflow/state/plan/event 版本为 `0.5.0/1.1.0/1.1.0/1.1.0`；未完成 0.4
+  checkpoint 显式失败，已完成历史 Turn 保持可读。
+
+目标与发布证据：
+
+- Goal/Plan、Provider 兼容、Graph 与两个原始 API 场景最新目标回归：`15 passed`；
+- `/agent-runs` 兼容 Adapter 的统一 Runtime 与幂等副作用已覆盖；
+- 前端单元 `12 passed`，Next.js 生产构建通过；
+- 确定性 `scripts/verify.ps1 -E2E`：后端 `132 passed / 1 deselected /
+  0 failed / 0 xfail`、契约 `3 passed`、前端 `12 passed`、ESLint、Next.js 构建与
+  Playwright `12/12` 通过；
+- 显式授权的专用真实模型验收选择 `qwen3.7-plus`：同一 Conversation 内场景 A
+  为 `collect_then_analyze / 24h / 3 / impact`，能力顺序为
+  `collection.run.start → intelligence.timeline.query → research.recommend →
+  research.trend_brief`；场景 B 为 `analyze_existing / 72h / 3 / impact`，
+  `collection.run.start × 0`，随后查询、推荐与综合。两轮均为 `complete`，
+  测试 `1 passed / 0 failed / 0 skipped / 0 xfail`，耗时约 92 秒；
+- 用户本地正式服务重启后使用稳定模型 ID 再执行场景 A：真实
+  `qwen3.7-plus` 在 `workflow_version=0.5.0` 完成结构化四步 Plan，requested 与
+  effective model ID 一致；采集 `40`、新增 `0`，精确 24 小时查询为 `0`，因此按
+  Acceptance Policy 返回 `partial` 并明确显示“0 条可追溯结果”，不再返回
+  `AGENT_EXECUTION_FAILED`。该现场验收耗时约 79 秒；
+- Release Safety、最终全量覆盖结果和 Draft PR 证据在本节完成后补录。
+
+Figma 阻塞：连接器拒绝向指定 FigJam 写入内部工作流架构，提示外部文件所有权与目标
+授权不足。已遵守门禁停止写入，没有新建替代文件或绕过；在取得用户明确外部目标授权
+并完成同板截图前，Figma 同步保持未完成。
+
+## 14. 2026-08-06 Workspace Agent 0.6.0 工具可选与语境推理
+
+状态：**代码、Graph Spec、契约、历史、确定性全栈与真实模型已通过；Figma
+仍等待同一外部目标的明确写入授权。**
+
+- Planner 允许只读 `model_reasoning`，工具不再是所有计划步骤的必选项；
+- N12～N14 对该步骤执行受控 bypass，N16 路由到 N18，由本轮
+  `effective_model_id` 完成语境推理；
+- `model_response` 结果块携带正文、basis、证据边界、信息 ID 与实际模型 ID；
+- Conversation Context 增加前序推荐、趋势和模型回答的小型 Result 摘要；
+- 模型连接状态改为 `pending / healthy / needs_retest / error / not_applicable`：
+  新建/编辑后标记待检测并由用户显式检测，正常模型选择不检测，疑似 Provider
+  错误只标记需复检；
+- Provider 核心仍为 OpenAI-compatible 中性接口；阿里云参数继续隔离在兼容适配器；
+- workflow/state/plan/event/context 版本为
+  `0.6.0/1.2.0/1.2.0/1.2.0/1.2.0`。
+
+验收证据：
+
+- Agent Runtime + 模型配置首批目标回归：
+  `26 passed / 0 failed / 0 skipped / 0 xfail`；
+- 前端单元：`12 passed / 0 failed / 0 skipped / 0 xfail`；
+- 最终 `scripts/verify.ps1 -E2E`：后端
+  `136 passed / 0 failed / 1 deselected / 0 xfail`，契约 `3 passed`，前端
+  `12 passed`，ESLint、Next.js 生产构建与 Playwright `12/12` 通过；
+- `validate_contracts.py`、`validate_versions.py`、`git diff --check` 通过；
+- Release Safety 的 worktree、tracked、history 三种模式全部通过；
+- 专用真实模型验收使用 `qwen3.7-plus`，测试
+  `1 passed / 0 failed / 0 skipped / 0 xfail`，耗时约 100 秒：
+  - 24 小时场景为 `collect_then_analyze`，真实调用
+    `collection.run.start → intelligence.timeline.query → research.recommend →
+    research.trend_brief`，返回 3 个真实 `information_id`；
+  - 三天场景为 `analyze_existing`，真实调用
+    `intelligence.timeline.query → research.recommend → research.trend_brief`，
+    没有再次采集；
+  - “请你挑选出刚才收集内容中，影响力最大的三个并进行分析总结”为
+    `direct/model_reasoning`，`capability_id=null`，Capability Invocation 为 0，
+    返回 `model_response`，requested/effective model 相同；
+- Replan 产生的旧步骤在运行记录中标记 `superseded`，不再作为 pending 冒充当前计划；
+- `model_response.information_ids` 从前序有界 Result 摘要复用真实 ID，不生成新 ID；
+- Figma：沿用已报告的目标授权阻塞，未重试或绕过。
+
+## 15. 2026-08-06 Workspace Agent 0.6.0 空结果推荐与趋势修复
+
+状态：**代码与目标回归通过，完整全栈和真实模型验收进行中；Figma 仍等待授权。**
+
+- 实机根因：查询返回 0 条后，N22 把 `items_below_minimum` 作为不可恢复失败，
+  `research.recommend` 和 `research.trend_brief` 因依赖失败均未执行；
+- 修复：空时间线、候选不足和无证据 finding 是可定位的 `partial` 覆盖缺口，
+  依赖链继续执行；
+- `research.recommend` 进入 N18，用本轮模型在有界候选上生成推荐理由和趋势综合；
+  `research.trend_brief` 复用同一结构化综合并保留独立 Capability Invocation；
+- 空候选时两个步骤仍执行，但只输出证据不足说明，不虚构 AI 热点、来源、ID 或评分；
+- SSE 新增 `model.research.started/completed` 和 `step.outcome`；UI 展示每步部分完成、
+  推荐说明、趋势不确定性和真实覆盖缺口；
+- OpenAI-compatible 结构化结果会在 Capability 边界内归一化：保留有效模型理由，
+  过滤无效/重复 ID，按真实能力排序补齐遗漏推荐，并把趋势引用约束到真实选择；
+  归一化不增加模型调用；
+- 工作区证据核验为 46 条信息、6 个来源配置（3 个启用），24h/3d/30d 分别为
+  0/3/34 条；采集 40、新增 0 是去重，不再错误等同为工作区没有证据；
+- 精确窗口不足时明确补充已保存背景，披露实际窗口；默认中文、唯一总结块、证据和
+  不确定性去重、模型错误中文解释已实现；
+- 联网搜索为待审核的 17.2 Blueprint Change Proposal，当前未改生产拓扑；
+- 当前定向证据：后端 30 passed，默认中文/Provider 后备目标集 19 passed，
+  Web 13 passed，ESLint passed；最终全量和真实模型验收待更新。
+
+## 16. 2026-08-06 Workspace Agent 0.7.0 统一搜索与联网补证
+
+状态：**实现、完整确定性全栈、Release Safety、真实模型验收与 Figma 同板同步
+已全部通过。**
+
+- 新增 `intelligence.search`：同一 `intelligence_id` 跨待处理、情报库、已归档和
+  卡片阶段检索，避免重复候选；
+- 排序采用 FTS5 BM25、短词子串兜底、RRF 融合以及 Top 候选 SimHash 近重复分组；
+- 新增 `web.search.collect`：本地结果达到目标时零网络调用；不足时通过 Provider
+  Adapter 搜索 URL，遵守 robots 与现有 SSRF/MIME/大小边界，页面和查询均有 TTL
+  缓存；
+- 抓取结果进入原有 RawItem/Intelligence 分析、标签、优先级和 canonical URL 去重
+  链路，模型只接收紧凑候选；
+- 缺少搜索密钥或外部 Provider 失败时返回中文 partial 和明确错误，保留本地研究结果；
+- 默认 Brave 仅是第一个 Search Provider Adapter；Agent Graph、Capability 和模型
+  分析仍不感知厂商；
+- workflow/state/plan/event/context 版本为
+  `0.7.0/1.2.0/1.2.0/1.2.0/1.3.0`；
+- Capability 的 Domain、kind、side effect、risk 和 acceptance policy 由服务端注册
+  契约裁定；Goal 已验证的时间窗、条数和排序条件由服务端写回 Plan 与工具输入，
+  避免不同 Provider 的字段别名、未知 Domain 或风险自报造成无效重规划、审批中断和
+  `FileNotFoundError`；
+- 真实中高风险写操作仍按服务端策略进入审批，联网读取、受限抓取与缓存不会因模型
+  自报 `medium` 风险而错误暂停。
+- Context Contract `1.3.0` 增加从持久 Plan/步骤状态/安全错误摘要派生的工作记事板；
+  每个模型步骤都会复述目标、当前步骤与 Todo，Turn 结束后不把派生 scratchpad 污染
+  下一任务；
+- 模型载荷改为确定性合法 JSON 预算压缩，超限优先保留可恢复 ID、路径、URL、目标、
+  状态和错误码，并产生 `context.compacted` 事件；不再用字符串切片生成残缺 JSON，
+  也不为压缩额外调用真实模型。
+
+验收证据：
+
+- 后端确定性全量：`155 passed / 1 deselected / 0 failed / 0 xfail`；
+- 契约 `3 passed`、前端 `13 passed`、ESLint、Next.js 生产构建和 Playwright
+  `12/12` 通过；
+- `git diff --check` 与 Release Safety 的 worktree、tracked、history 模式通过；
+- 专用真实模型验收选择 `qwen3.7-plus`：`1 passed / 0 failed / 0 skipped /
+  0 xfail`，耗时约 146 秒。同一 Conversation 中 24 小时
+  `collect_then_analyze` 五步链、72 小时 `analyze_existing` 三步链、无工具
+  `direct/model_reasoning` 均为 `complete`；
+- 2026-08-07 获得用户明确授权后，已将 0.7.0 统一搜索与按需联网补证流程追加到
+  `https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad`，可编辑图节点为
+  `10:305`～`10:385`；
+- Figma Release Sync Section `12:364` 明确记录
+  `0.7.0/1.2.0/1.2.0/1.2.0/1.3.0`、Context Engineering 边界和上述验收证据；
+  节点回读与 2048px 截图核验均通过，无裁切、无重叠，图谱同步门禁已关闭。

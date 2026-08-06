@@ -31,6 +31,19 @@ def test_release_guard_reports_location_without_secret_value() -> None:
     )
 
 
+def test_release_guard_distinguishes_prompt_names_from_provider_tokens() -> None:
+    prompt_path = (
+        b"02-workspace-agent-complex-task-repair-coding-agent-prompt.md"
+    )
+    provider_token = b"sk-" + b"proj-abcDEF0123456789abcDEF0123456789"
+
+    assert _content_findings("README.md", prompt_path) == []
+    assert [
+        item.rule_id
+        for item in _content_findings("config.txt", provider_token)
+    ] == ["SECRET_PROVIDER_TOKEN"]
+
+
 def test_gitignore_covers_nested_local_config_and_runtime_data() -> None:
     result = subprocess.run(
         [

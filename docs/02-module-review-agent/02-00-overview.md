@@ -31,21 +31,22 @@
 3. [02-03 Agent 上下文工程与动态工作流](02-03-agent-context-engineering-and-workflows.md)
 4. [02-04 Agent 工作流历史图谱](02-04-agent-workflow-history.md)
 5. [02-05 Workspace Agent 最终工程蓝图](02-05-final-agent-engineering-blueprint.md)
-
-实施入口：
-
-- [Module 2 Workspace Agent 继续开发提示词](../../prompts/02-module-review-agent/02-workspace-agent-next-slice-coding-agent-prompt.md)
 6. [05-01 Capability 统一能力契约](../05-platform/05-01-capability-contract.md)
 7. [05-02 LangGraph 工作流](../05-platform/05-02-langgraph-workflows.md)
 8. [06-02 可观测性与调试](../06-quality-operations/06-02-observability-and-debugging.md)
 9. [06-03 安全与审批](../06-quality-operations/06-03-security-and-approval.md)
+
+实施入口：
+
+- [Module 2 Workspace Agent 继续开发提示词](../../prompts/02-module-review-agent/02-workspace-agent-next-slice-coding-agent-prompt.md)
+- [Module 2 复杂任务修复与纵向优化提示词](../../prompts/02-module-review-agent/02-workspace-agent-complex-task-repair-coding-agent-prompt.md)
 
 ## 机器资料
 
 - [Capability Catalog](../../contracts/01-capabilities/capability-catalog.yaml)
 - [Review Graph](../../graph-specs/02-module-review-agent/02-review-graph.yaml)
 - [Agent Task Graph 0.4.0](../../graph-specs/02-module-review-agent/02-agent-task-graph.yaml)
-- [Agent Pack 示例](../../agent-packs/ai-editor/agent.yaml)
+- [Agent Pack 示例](../../agent-packs/examples/ai-editor/agent.yaml)
 
 ## 完成证据
 

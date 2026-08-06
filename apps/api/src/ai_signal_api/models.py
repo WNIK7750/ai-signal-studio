@@ -150,7 +150,7 @@ class AgentTurnModel(Base):
     )
     message: Mapped[str] = mapped_column(Text)
     workflow_version: Mapped[str] = mapped_column(
-        String(24), default="0.4.0"
+        String(24), default="0.7.0"
     )
     manifest: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     plan: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -389,6 +389,60 @@ class IntelligenceItemModel(Base):
 
     raw_item: Mapped[RawItemModel] = relationship(
         back_populates="intelligence"
+    )
+
+
+class WebSearchCacheModel(Base):
+    __tablename__ = "web_search_cache"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: new_id("websearch")
+    )
+    provider: Mapped[str] = mapped_column(String(40), index=True)
+    query_digest: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True
+    )
+    query: Mapped[str] = mapped_column(String(500))
+    freshness: Mapped[str | None] = mapped_column(
+        String(24), nullable=True
+    )
+    result_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+
+
+class WebPageCacheModel(Base):
+    __tablename__ = "web_page_cache"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: new_id("webpage")
+    )
+    canonical_url: Mapped[str] = mapped_column(
+        Text, unique=True, index=True
+    )
+    url: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(500))
+    excerpt: Mapped[str] = mapped_column(Text, default="")
+    content_text: Mapped[str] = mapped_column(Text, default="")
+    content_digest: Mapped[str] = mapped_column(String(64), index=True)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(24), default="ready", index=True
+    )
+    error_code: Mapped[str | None] = mapped_column(
+        String(80), nullable=True
+    )
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
     )
 
 

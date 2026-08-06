@@ -66,6 +66,14 @@ def test_turn_returns_202_persists_ordered_events_and_resumes_by_event_id(
         "turn.partial",
         "turn.failed",
     }
+    outcome_events = [
+        event for event in events if event["event"] == "step.outcome"
+    ]
+    assert outcome_events
+    assert all(
+        event["data"]["status"] in {"completed", "partial", "failed"}
+        for event in outcome_events
+    )
     assert all(
         events[index]["data"]["elapsed_ms"]
         <= events[index + 1]["data"]["elapsed_ms"]

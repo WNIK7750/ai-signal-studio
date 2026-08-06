@@ -278,11 +278,16 @@ def test_workspace_agent_capabilities_can_edit_and_render_cards(
 
 def test_capability_switch_blocks_every_entry_point(tmp_path) -> None:
     app = create_app(
-        settings=Settings(
-            _env_file=None,
-            database_url=f"sqlite:///{(tmp_path / 'disabled.db').as_posix()}",
-            disabled_capabilities=["review.batch.submit"],
-        ),
+            settings=Settings(
+                _env_file=None,
+                database_url=f"sqlite:///{(tmp_path / 'disabled.db').as_posix()}",
+                disabled_capabilities=["review.batch.submit"],
+                agent_test_mode=True,
+                model_config_path=tmp_path / "models.local.json",
+                model_secrets_path=tmp_path / "model-secrets.local.json",
+                artifact_root=tmp_path / "artifacts",
+                agent_pack_root=tmp_path / "agent-packs",
+            ),
         seed_demo_sources=True,
     )
     with TestClient(app) as client:

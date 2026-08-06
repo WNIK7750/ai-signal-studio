@@ -77,7 +77,22 @@ paths:
         schema: {type: string}
     post:
       operationId: createAgentTurn
-      summary: Persist an idempotent Agent turn and start the 0.4.0 graph
+      summary: Persist an idempotent Agent turn and start the 0.7.0 graph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, client_message_id]
+              properties:
+                message: {type: string, minLength: 1, maxLength: 4000}
+                client_message_id: {type: string, minLength: 1, maxLength: 100}
+                model_id: {type: [string, 'null']}
+                artifact_ids:
+                  type: array
+                  maxItems: 20
+                  items: {type: string}
       responses:
         '202':
           description: Queued turn with its persisted user message
@@ -92,7 +107,7 @@ paths:
       summary: Read persisted plan, outcome, duration, blocks, and errors
       responses:
         '200':
-          description: Durable Agent turn
+          description: Durable Agent turn with Goal, Plan, requested/effective model IDs, an always-present localized result_summary, deduplicated ResultBlocks, evidence-window disclosure, and actionable errors
   /api/agent-turns/{turn_id}/events:
     parameters:
       - in: path
@@ -105,7 +120,7 @@ paths:
         schema: {type: integer, minimum: 0}
     get:
       operationId: streamAgentTurnEvents
-      summary: Stream persisted ordered events and resume after an event ID
+      summary: Stream persisted ordered events including shared model research, per-step outcomes, and complete validated ResultBlocks, resuming after an event ID
       responses:
         '200':
           description: text/event-stream ending after the durable terminal event
@@ -126,7 +141,7 @@ paths:
   /api/agent-runs:
     post:
       operationId: runWorkspaceAgentTurn
-      summary: Persist and execute an idempotent Agent turn
+      summary: Compatibility adapter that delegates to the same 0.7.0 Turn Runtime
       responses:
         '200':
           description: Persisted Agent response and capability calls

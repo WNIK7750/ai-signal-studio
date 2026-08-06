@@ -39,14 +39,34 @@ def test_workspace_agent_real_model_full_chain(tmp_path: Path) -> None:
         )
         assert conversation.status_code == 201
         conversation_id = conversation.json()["id"]
+        requested_live_model = os.getenv(
+            "AI_SIGNAL_LIVE_MODEL_ID",
+            "qwen3.7-plus",
+        )
+        models = client.get("/api/models").json()
+        selected_model = next(
+            (
+                model
+                for model in models
+                if model["model_id"] == requested_live_model
+                or model["name"] == requested_live_model
+            ),
+            None,
+        )
+        if selected_model is None:
+            pytest.skip(
+                f"configured live model {requested_live_model} is unavailable"
+            )
+        selected_model_id = selected_model["id"]
         accepted = client.post(
             f"/api/agent-conversations/{conversation_id}/turns",
             json={
                 "message": (
-                    "推荐过去 30 天最值得关注的 3 条 Agent 信息，"
-                    "每条必须带站内引用。"
+                    "你好，请你帮我收集最近24小时的热点AI内容，"
+                    "并选出其中影响力最大的三个，给我分析总结"
                 ),
                 "client_message_id": "live-acceptance-once",
+                "model_id": selected_model_id,
             },
         )
         assert accepted.status_code == 202
@@ -64,8 +84,10 @@ def test_workspace_agent_real_model_full_chain(tmp_path: Path) -> None:
             assert response.status_code == 200
             turn = response.json()
 
-        assert turn["status"] in {"complete", "partial", "failed"}
-        assert turn["workflow_version"] == "0.4.0"
+        assert turn["status"] == "complete", turn
+        assert turn["workflow_version"] == "0.7.0"
+        assert turn["requested_model_id"] == selected_model_id
+        assert turn["effective_model_id"] == selected_model_id
         assert turn["total_duration_ms"] >= 0
         assert turn["plan"] or turn["error"]
 
@@ -88,3 +110,110 @@ def test_workspace_agent_real_model_full_chain(tmp_path: Path) -> None:
             serialized = str(referenced)
             assert "info_" in serialized
             assert "/timeline?focus=info_" in serialized
+
+        follow_up = client.post(
+            f"/api/agent-conversations/{conversation_id}/turns",
+            json={
+                "message": (
+                    "那么请你就目前收集的三天内的热点AI内容，"
+                    "并选出其中影响力最大的三个，给我分析总结"
+                ),
+                "client_message_id": "live-acceptance-follow-up-once",
+                "model_id": selected_model_id,
+            },
+        )
+        assert follow_up.status_code == 202
+        follow_up_turn_id = follow_up.json()["id"]
+        deadline = time.monotonic() + 90
+        follow_up_turn = follow_up.json()
+        while (
+            follow_up_turn["status"]
+            not in {"complete", "partial", "failed", "cancelled"}
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.25)
+            response = client.get(
+                f"/api/agent-turns/{follow_up_turn_id}"
+            )
+            assert response.status_code == 200
+            follow_up_turn = response.json()
+
+        assert follow_up_turn["status"] == "complete", follow_up_turn
+        assert follow_up_turn["requested_model_id"] == selected_model_id
+        assert follow_up_turn["effective_model_id"] == selected_model_id
+        follow_up_goal = follow_up_turn["result"]["goal"]
+        assert follow_up_goal["operation_mode"] == "analyze_existing"
+        assert follow_up_goal["time_window"]["lookback_hours"] == 72
+        assert follow_up_goal["max_items"] == 3
+        capabilities = [
+            step["capability_id"]
+            for step in follow_up_turn["plan"]["steps"]
+        ]
+        assert capabilities == [
+            "intelligence.search",
+            "research.recommend",
+            "research.trend_brief",
+        ]
+        follow_up_blocks = follow_up_turn["result"]["result_blocks"]
+        follow_up_references = [
+            block
+            for block in follow_up_blocks
+            if block["type"] in {
+                "signal_preview",
+                "recommendation_list",
+                "information_list",
+            }
+        ]
+        assert follow_up_references
+        follow_up_serialized = str(follow_up_references)
+        assert "info_" in follow_up_serialized
+        assert "/timeline?focus=info_" in follow_up_serialized
+
+        contextual = client.post(
+            f"/api/agent-conversations/{conversation_id}/turns",
+            json={
+                "message": (
+                    "请你挑选出刚才收集内容中，"
+                    "影响力最大的三个并进行分析总结"
+                ),
+                "client_message_id": "live-contextual-reasoning-once",
+                "model_id": selected_model_id,
+            },
+        )
+        assert contextual.status_code == 202
+        contextual_turn_id = contextual.json()["id"]
+        deadline = time.monotonic() + 90
+        contextual_turn = contextual.json()
+        while (
+            contextual_turn["status"]
+            not in {"complete", "partial", "failed", "cancelled"}
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.25)
+            response = client.get(
+                f"/api/agent-turns/{contextual_turn_id}"
+            )
+            assert response.status_code == 200
+            contextual_turn = response.json()
+
+        assert contextual_turn["status"] == "complete", contextual_turn
+        assert contextual_turn["requested_model_id"] == selected_model_id
+        assert contextual_turn["effective_model_id"] == selected_model_id
+        contextual_steps = contextual_turn["plan"]["steps"]
+        assert len(contextual_steps) == 1
+        assert contextual_steps[0]["kind"] == "model_reasoning"
+        assert contextual_steps[0]["capability_id"] is None
+        model_response = next(
+            block
+            for block in contextual_turn["result"]["result_blocks"]
+            if block["type"] == "model_response"
+        )
+        assert model_response["data"]["content"]
+        assert (
+            model_response["data"]["basis"]
+            == "conversation_context"
+        )
+        assert (
+            model_response["data"]["effective_model_id"]
+            == selected_model_id
+        )

@@ -55,6 +55,7 @@ def main() -> int:
                 "PYTHONIOENCODING": "utf-8",
                 "AI_SIGNAL_DATABASE_URL": f"sqlite:///{database_path}",
                 "AI_SIGNAL_LLM_PROVIDER": "heuristic",
+                "AI_SIGNAL_AGENT_TEST_MODE": "true",
                 "AI_SIGNAL_SOURCE_SEED_MODE": "demo",
                 "AI_SIGNAL_MODEL_CONFIG_PATH": model_config_path,
                 "AI_SIGNAL_MODEL_SECRETS_PATH": model_secrets_path,

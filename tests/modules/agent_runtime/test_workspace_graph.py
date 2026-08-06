@@ -160,8 +160,13 @@ def test_one_source_failure_returns_partial_with_signal_previews(client) -> None
     result, _calls = _run_graph(client)
 
     assert result.status == "partial"
+    assert result.message != "任务未完成，请查看可定位错误。"
+    assert "来源" in result.message
     assert any(
         block.type == "partial_failure" for block in result.result_blocks
+    )
+    assert any(
+        block.type == "result_summary" for block in result.result_blocks
     )
     assert any(
         block.type == "signal_preview" for block in result.result_blocks

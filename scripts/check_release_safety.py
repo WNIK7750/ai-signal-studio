@@ -52,7 +52,8 @@ CONTENT_RULES = (
     (
         "SECRET_PROVIDER_TOKEN",
         re.compile(
-            rb"(?:sk-[A-Za-z0-9_-]{20,}|"
+            rb"(?:sk-(?=[A-Za-z0-9_-]{20,})"
+            rb"(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{20,}|"
             rb"gh[pousr]_[A-Za-z0-9]{20,}|"
             rb"AKIA[A-Z0-9]{16})"
         ),
