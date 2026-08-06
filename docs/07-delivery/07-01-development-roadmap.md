@@ -1,5 +1,15 @@
 # 07-01 开发路线图：模块级大步快跑
 
+> 四个初始模块形成基础成品后的下一阶段实施依据见
+> [07-03 产品、业务与体验全面优化蓝图](07-03-product-and-experience-optimization-blueprint.md)。
+> 已落地范围、测试证据和新增任务顺序见
+> [07-04 全面优化实现状态](07-04-optimization-implementation-status.md)。
+> Workspace Agent 的 Base + Domain 上下文、真实 LangChain/LangGraph Runtime 和动态
+> 工作流设计见
+> [02-03 Agent 上下文工程与动态工作流](../02-module-review-agent/02-03-agent-context-engineering-and-workflows.md)，
+> Context + Harness 最终指导见
+> [02-05 Workspace Agent 最终工程蓝图](../02-module-review-agent/02-05-final-agent-engineering-blueprint.md)。
+
 ## 总原则
 
 不是先完成所有架构底座，而是每一步交付一个能实际使用的成品模块。抽象只做到支撑当前模块，并为下一模块留下清晰接口。
@@ -64,8 +74,14 @@
 - 审核条目区、决策检查器和批量操作条的专用布局；
 - 状态流转；
 - Agent Pack 基础加载；
+- 版本化 Base Prompt 与模块 Domain Pack；
 - Capability Policy；
-- 动态 LangChain Tools；
+- LangChain Agent Middleware 与动态 Structured Tools；
+- LangGraph Plan/Execute/Replan、持久 Checkpointer 和 interrupt/resume；
+- Product Turn Harness、Evidence/Artifact Journal、取消、恢复、预算和统一 Finalizer；
+- 本地 Scenario Dataset、Outcome/Trajectory Grader 与可选 LangSmith Trace；
+- 信息检索、筛选、推荐、比较、趋势和采集后分析工作流；
+- 站内读能力与受控写能力的 Capability 覆盖；
 - 审批 Token；
 - Agent 结构化 UI；
 - 聚焦对话流、稳定 Composer 和按需运行/审批详情面板；
@@ -78,6 +94,9 @@
 - interrupt 后可恢复；
 - 拒绝不物理删除；
 - 审批 Token 绑定输入；
+- 未选 Domain 的 Prompt/Tool 不进入模型上下文；
+- 复杂请求生成有界结构化 Plan，局部失败后独立步骤继续；
+- 进程重启后 LangGraph checkpoint 可恢复且不重复副作用；
 - 一个“Agent 发起批量审核、用户确认”的 E2E。
 
 ---
@@ -120,7 +139,8 @@
 
 ### 成品目标
 
-用户批量确认后先获得可浏览的信息卡片成品；卡片浏览稳定后再加入 PNG 海报与 A2A/MCP。
+用户批量确认后先获得可浏览的信息卡片成品；卡片浏览稳定后再加入 PNG 海报。外部
+Agent Gateway 已完成设计，但作为产品最后阶段暂不进入当前开发任务。
 
 ### 实现范围
 
@@ -131,8 +151,8 @@
 - 100～1000 字详情摘要上限；
 - “采集到卡片详情”的 Playwright 闭环；
 - 后续增量：Poster Graph、编辑器、PNG 渲染；
-- A2A Agent Card 与三个 Skills；
-- MCP Resources/Tools；
+- 最终互操作阶段先交付默认关闭的本机只读 MCP Resources/Tools；
+- 存在明确长任务客户端后再交付 A2A Agent Card 与少量高层 Skills；
 - OpenAPI 完善；
 - 外部 Agent 策略；
 - 导出与审计。
@@ -143,7 +163,7 @@
 - 卡片重复生成幂等；
 - 摘要上限和日期时区正确；
 - 文字模板索引在 0～5 内且不依赖生图模型；
-- A2A/MCP 无法绕过 Policy；
+- 最终互操作阶段验证 MCP/A2A 无法绕过 Policy；
 - 一个完整“采集到卡片详情”的 E2E；
 - PNG 上线时再增加“采集到 PNG”的 E2E。
 

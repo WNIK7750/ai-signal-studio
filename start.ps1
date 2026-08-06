@@ -5,7 +5,7 @@ $python = Join-Path $projectRoot ".venv\Scripts\python.exe"
 $launcher = Join-Path $projectRoot "scripts\start_app.py"
 
 if (-not (Test-Path -LiteralPath $python)) {
-    Write-Host "[ERROR] E1001（后端虚拟环境不存在）请先运行 setup.cmd"
+    Write-Host "[ERROR] Runtime missing. Run setup.cmd first."
     exit 1
 }
 
@@ -14,7 +14,6 @@ try {
     exit $LASTEXITCODE
 }
 catch {
-    Write-Host "[ERROR] E1099（启动脚本执行失败）"
-    Write-Host $_.Exception.Message
+    Write-Host "[ERROR] Launcher failed. See logs."
     exit 1
 }

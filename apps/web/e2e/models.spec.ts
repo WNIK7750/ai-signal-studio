@@ -85,7 +85,7 @@ test("create, manually switch, and validate an image model", async ({
     ),
   });
 
-  await page.getByRole("link", { name: "对话 Agent" }).click();
+  await page.getByRole("link", { name: "Agent", exact: true }).click();
   const modelSelect = page.getByLabel("选择对话模型");
   await expect(page.getByRole("link", { name: "设定模型" })).toBeVisible();
   await expect(page.getByRole("button", { name: "语音转文字" })).toBeVisible();
@@ -136,18 +136,18 @@ test("create, manually switch, and validate an image model", async ({
   });
 
   await page.evaluate(() => {
-    Object.defineProperty(window, "SpeechRecognition", {
+    Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: undefined,
     });
-    Object.defineProperty(window, "webkitSpeechRecognition", {
+    Object.defineProperty(window, "MediaRecorder", {
       configurable: true,
       value: undefined,
     });
   });
   await page.getByRole("button", { name: "语音转文字" }).click();
   await expect(
-    page.getByText("VOICE-001（当前浏览器不支持语音转文字）"),
+    page.getByText("VOICE-001（当前浏览器不支持实时语音转文字）"),
   ).toBeVisible();
 
   await modelSelect.selectOption({ label: editedModelName });

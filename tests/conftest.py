@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 
 import pytest
@@ -12,6 +13,24 @@ class FakeModelChat:
         return f"{model.name}回复：已收到{len(image_urls)}张图片。"
 
 
+def pytest_collection_modifyitems(
+    config: pytest.Config,
+    items: list[pytest.Item],
+) -> None:
+    del config
+    if os.getenv("AI_SIGNAL_RUN_LIVE_MODEL_TESTS") == "1":
+        return
+    skip_live = pytest.mark.skip(
+        reason=(
+            "real-model acceptance requires "
+            "AI_SIGNAL_RUN_LIVE_MODEL_TESTS=1"
+        )
+    )
+    for item in items:
+        if "live_model" in item.keywords:
+            item.add_marker(skip_live)
+
+
 @pytest.fixture()
 def client(tmp_path) -> Iterator[TestClient]:
     database_url = f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
@@ -22,6 +41,8 @@ def client(tmp_path) -> Iterator[TestClient]:
             llm_provider="heuristic",
             model_config_path=tmp_path / "models.local.json",
             model_secrets_path=tmp_path / "model-secrets.local.json",
+            artifact_root=tmp_path / "artifacts",
+            agent_pack_root=tmp_path / "agent-packs",
         ),
         seed_demo_sources=True,
     )

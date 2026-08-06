@@ -3,6 +3,19 @@ info:
   title: AI Signal Studio API
   version: 0.1.0
 paths:
+  /api/agent-conversations:
+    get:
+      operationId: listAgentConversations
+      summary: List active, archived, or softly deleted conversations
+      responses:
+        '200':
+          description: Conversation summaries ordered by pin and activity
+    post:
+      operationId: createAgentConversation
+      summary: Create a local Agent conversation
+      responses:
+        '201':
+          description: Empty persisted conversation
   /api/agent-conversations/current:
     get:
       operationId: getCurrentAgentConversation
@@ -10,6 +23,106 @@ paths:
       responses:
         '200':
           description: Conversation with persisted messages
+  /api/agent-conversations/{conversation_id}:
+    parameters:
+      - in: path
+        name: conversation_id
+        required: true
+        schema: {type: string}
+    get:
+      operationId: getAgentConversation
+      summary: Read one conversation and its persisted messages
+      responses:
+        '200':
+          description: Conversation detail
+    patch:
+      operationId: updateAgentConversation
+      summary: Rename or pin a conversation
+      responses:
+        '200':
+          description: Updated conversation
+    delete:
+      operationId: deleteAgentConversation
+      summary: Softly delete a conversation
+      responses:
+        '200':
+          description: Softly deleted conversation
+  /api/agent-conversations/{conversation_id}/archive:
+    parameters:
+      - in: path
+        name: conversation_id
+        required: true
+        schema: {type: string}
+    post:
+      operationId: archiveAgentConversation
+      responses:
+        '200':
+          description: Archived conversation
+  /api/agent-conversations/{conversation_id}/restore:
+    parameters:
+      - in: path
+        name: conversation_id
+        required: true
+        schema: {type: string}
+    post:
+      operationId: restoreAgentConversation
+      responses:
+        '200':
+          description: Restored conversation with messages preserved
+  /api/agent-conversations/{conversation_id}/turns:
+    parameters:
+      - in: path
+        name: conversation_id
+        required: true
+        schema: {type: string}
+    post:
+      operationId: createAgentTurn
+      summary: Persist an idempotent Agent turn and start the 0.4.0 graph
+      responses:
+        '202':
+          description: Queued turn with its persisted user message
+  /api/agent-turns/{turn_id}:
+    parameters:
+      - in: path
+        name: turn_id
+        required: true
+        schema: {type: string}
+    get:
+      operationId: getAgentTurn
+      summary: Read persisted plan, outcome, duration, blocks, and errors
+      responses:
+        '200':
+          description: Durable Agent turn
+  /api/agent-turns/{turn_id}/events:
+    parameters:
+      - in: path
+        name: turn_id
+        required: true
+        schema: {type: string}
+      - in: header
+        name: Last-Event-ID
+        required: false
+        schema: {type: integer, minimum: 0}
+    get:
+      operationId: streamAgentTurnEvents
+      summary: Stream persisted ordered events and resume after an event ID
+      responses:
+        '200':
+          description: text/event-stream ending after the durable terminal event
+  /api/agent-turns/{turn_id}/cancel:
+    post:
+      operationId: cancelAgentTurn
+      summary: Request cancellation while preserving completed results
+      responses:
+        '200':
+          description: Updated turn cancellation state
+  /api/agent-turns/{turn_id}/resume:
+    post:
+      operationId: resumeAgentTurn
+      summary: Resume a failed or cancelled turn with the same thread ID
+      responses:
+        '202':
+          description: Resumable turn queued on its persistent checkpoint
   /api/agent-runs:
     post:
       operationId: runWorkspaceAgentTurn
@@ -31,6 +144,58 @@ paths:
       responses:
         '200':
           description: Timeline page
+  /api/tasks:
+    get:
+      operationId: listCollectionTasks
+      summary: List versioned collection tasks
+      responses:
+        '200':
+          description: Collection tasks
+    post:
+      operationId: createCollectionTask
+      summary: Create a task and its first immutable configuration version
+      responses:
+        '201':
+          description: Created task
+  /api/tasks/{task_id}/preview:
+    post:
+      operationId: previewCollectionTask
+      summary: Run the real fetch and filter funnel without persisting items
+      responses:
+        '200':
+          description: Funnel counts and samples
+  /api/tasks/{task_id}/runs:
+    post:
+      operationId: runCollectionTask
+      summary: Run the selected immutable task version
+      responses:
+        '201':
+          description: Task run with execution and coverage status
+  /api/task-runs/{run_id}/retry:
+    post:
+      operationId: retryCollectionTaskRun
+      summary: Retry with the original or current task version
+      responses:
+        '201':
+          description: Reproducible retry result
+  /api/information/{item_id}/state:
+    patch:
+      operationId: updateWorkspaceItemState
+      summary: Update read, starred, archived, or note state
+      responses:
+        '200':
+          description: Workspace item state
+  /api/saved-views:
+    get:
+      operationId: listSavedViews
+      responses:
+        '200':
+          description: Saved information views
+    post:
+      operationId: createSavedView
+      responses:
+        '201':
+          description: Saved query and display configuration
   /api/review-batches/{batch_id}/decisions:
     post:
       operationId: submitReviewDecisions
@@ -67,11 +232,85 @@ paths:
       responses:
         '200':
           description: Card detail with source link
+    patch:
+      operationId: updateCardRevision
+      summary: Optimistically edit a card and invalidate stale renders
+      responses:
+        '200':
+          description: Updated card revision
+        '409':
+          description: CARD_REVISION_CONFLICT
+  /api/cards/{card_id}/render:
+    post:
+      operationId: renderCardPng
+      summary: Render the current card revision through the local renderer
+      responses:
+        '200':
+          description: Idempotent 1200 by 1500 PNG Artifact reference
+  /api/cards/workflows:
+    post:
+      operationId: startPosterWorkflow
+      summary: Start the Poster Graph at draft approval
+      responses:
+        '200':
+          description: Durable workflow interrupt state
+  /api/cards/workflows/{thread_id}/resume:
+    post:
+      operationId: resumePosterWorkflow
+      summary: Resume draft or render approval through LangGraph Command
+      responses:
+        '200':
+          description: Waiting, completed, or partial Poster outcome
+  /api/agent-packs/import-preview:
+    post:
+      operationId: previewAgentPackImport
+      summary: Validate an Agent Pack archive and return a diff without activation
+      responses:
+        '200':
+          description: Validated file diff and manifest
+  /api/agent-packs/import:
+    post:
+      operationId: importAgentPack
+      summary: Atomically install and optionally activate a validated Agent Pack
+      responses:
+        '201':
+          description: Immutable Agent Pack version
+  /api/agent-packs/{pack_id}/search:
+    get:
+      operationId: searchAgentPack
+      summary: Search the active Pack through the rebuildable SQLite FTS index
+      responses:
+        '200':
+          description: Bounded Pack references and excerpts
+  /api/artifacts:
+    get:
+      operationId: listArtifacts
+      responses:
+        '200':
+          description: Local Artifact metadata
+    post:
+      operationId: createArtifact
+      summary: Validate and store local content by digest
+      responses:
+        '201':
+          description: Deduplicated Artifact reference
+  /api/artifacts/{artifact_id}/content:
+    get:
+      operationId: downloadArtifactContent
+      responses:
+        '200':
+          description: Validated local Artifact bytes
   /api/transcription/sessions:
     post:
       operationId: startTranscriptionSession
       responses:
         '201':
           description: Session created
+  /api/transcription/sessions/{session_id}:
+    get:
+      operationId: getTranscriptionSession
+      responses:
+        '200':
+          description: Session state without the short-lived token
 # WebSocket /ws/transcription/{session_id} is documented separately by
 # contracts/03-realtime-transcription/realtime-transcription-protocol.schema.json.

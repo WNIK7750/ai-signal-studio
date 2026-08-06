@@ -4,6 +4,9 @@
   "title": "Realtime Transcription Message v1",
   "oneOf": [
     {
+      "$ref": "#/$defs/started"
+    },
+    {
       "$ref": "#/$defs/start"
     },
     {
@@ -23,6 +26,26 @@
     }
   ],
   "$defs": {
+    "started": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "session_id",
+        "provider"
+      ],
+      "properties": {
+        "type": {
+          "const": "session.started"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        }
+      }
+    },
     "start": {
       "type": "object",
       "additionalProperties": false,

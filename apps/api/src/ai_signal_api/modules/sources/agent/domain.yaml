@@ -1,0 +1,12 @@
+id: sources
+version: 1.0.0
+title: 来源
+description: 查询、无副作用测试和修改信息来源
+capabilities:
+  - source.list
+  - source.test
+  - source.update
+result_blocks:
+  - evidence_sources
+  - navigation_action
+  - partial_failure

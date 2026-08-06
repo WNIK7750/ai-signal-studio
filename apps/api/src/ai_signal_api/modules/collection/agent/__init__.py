@@ -1,0 +1,1 @@
+"""Collection Agent domain pack."""

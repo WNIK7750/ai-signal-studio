@@ -12,6 +12,11 @@ dependencies = [
   "fastapi>=0.116,<1",
   "feedparser>=6.0,<7",
   "httpx>=0.28,<1",
+  "jsonschema>=4.25,<5",
+  "langchain>=1.1,<2",
+  "langchain-openai>=1.1,<2",
+  "langgraph>=1.0,<2",
+  "langgraph-checkpoint-sqlite>=3.0,<4",
   "pydantic-settings>=2.10,<3",
   "python-dateutil>=2.9,<3",
   "sqlalchemy>=2.0,<3",
@@ -19,11 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-agent = [
-  "langchain-core>=0.3,<2",
-]
 dev = [
-  "jsonschema>=4.25,<5",
   "pytest>=8.4,<10",
   "pytest-cov>=6,<8",
 ]
@@ -34,4 +35,7 @@ where = ["apps/api/src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["apps/api/src"]
-addopts = "-ra"
+addopts = "-ra -m 'not live_model'"
+markers = [
+  "live_model: complete product-chain acceptance using a configured real model; excluded by default",
+]

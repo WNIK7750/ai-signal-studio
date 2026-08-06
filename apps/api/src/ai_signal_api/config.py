@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     enable_scheduler: bool = True
     disabled_capabilities: list[str] = Field(default_factory=list)
     source_seed_mode: Literal["live", "demo", "none"] = "live"
+    agent_checkpoint_path: Path | None = None
+    artifact_root: Path = Path("data/artifacts")
+    agent_pack_root: Path = Path("data/agent-packs")
+    artifact_max_bytes: int = Field(default=10_000_000, ge=1024)
+    stt_token_ttl_seconds: int = Field(default=300, ge=30, le=3600)
+    stt_max_chunk_bytes: int = Field(default=1_000_000, ge=1024)
 
     # External provider credentials are read only from the process environment
     # or the local, git-ignored .env file.

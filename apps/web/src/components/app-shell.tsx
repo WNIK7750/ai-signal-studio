@@ -10,7 +10,11 @@ import {
   IconChecklist,
   IconHistory,
   IconLayoutSidebarLeftCollapse,
+  IconListDetails,
+  IconSettingsAutomation,
+  IconCpu,
   IconPalette,
+  IconPackage,
   IconRadar2,
   IconSparkles,
 } from "@tabler/icons-react";
@@ -20,13 +24,16 @@ import { useEffect, useState } from "react";
 
 const primary = [
   { href: "/timeline", label: "AI 信息", icon: IconRadar2 },
-  { href: "/review", label: "审核", icon: IconChecklist },
+  { href: "/review", label: "待处理", icon: IconChecklist },
   { href: "/cards", label: "卡片", icon: IconCards },
-  { href: "/agent", label: "对话 Agent", icon: IconRobot },
+  { href: "/tasks", label: "任务", icon: IconSettingsAutomation },
+  { href: "/agent", label: "Agent", icon: IconRobot },
   { href: "/runs", label: "运行记录", icon: IconHistory },
 ];
 const settings = [
+  { href: "/settings/assets", label: "Agent 资产", icon: IconPackage },
   { href: "/settings/sources", label: "来源", icon: IconDatabase },
+  { href: "/settings/models", label: "模型", icon: IconCpu },
   { href: "/settings/appearance", label: "外观", icon: IconPalette },
 ];
 
@@ -97,6 +104,13 @@ export function AppShell({
             </Link>
           ))}
         </nav>
+        <div className="local-service-state">
+          <IconListDetails size={17} />
+          <span>
+            <strong>本地工作区</strong>
+            <small>数据保存在当前设备</small>
+          </span>
+        </div>
         <button
           className="nav-collapse"
           onClick={toggleNavigation}

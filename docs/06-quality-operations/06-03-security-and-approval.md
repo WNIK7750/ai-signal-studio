@@ -94,3 +94,18 @@ Agent 不可把一次确认用于不同输入。
 只有在 `LLM_PROVIDER=openai_compatible` 且 API Key、模型均存在时，
 LLM 才被视为已配置。缺失配置返回 `LLM_PROVIDER_NOT_CONFIGURED`，
 不得静默回退并产生难以定位的结果差异。
+
+## 7. 发布 Guard 与本地数据隔离
+
+`scripts/check_release_safety.py` 提供 `--worktree`、`--tracked`、`--staged` 和
+`--history` 四种门禁，只输出规则 ID、路径和行号。它拒绝本地配置、数据库、日志、
+Agent Pack 本地版本、未批准媒体、常见 Provider Token、Authorization Header、
+Private Key、带凭据 URL 与本机绝对路径。
+
+`refs/codex/*` 是本地工作区检查点，不属于可推送分支/Tag 历史；history 模式只扫描
+branches、remotes 与 tags。固定版本 Gitleaks pre-commit 和完整历史 GitHub Action
+作为独立 Secret 扫描层。任何真实凭据命中都必须先轮换，不能仅靠删除当前文件或新增
+忽略规则。
+
+来源网络访问在每次请求及每个重定向目标上重新解析 DNS，并拒绝非公网地址、带凭据
+URL、超限重定向、错误内容类型和超过上限的响应体。

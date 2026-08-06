@@ -4,13 +4,13 @@
 
 默认候选：`whisperlive/`。
 
-应用自有接口位于未来代码目录：
+应用自有接口与隔离 Adapter 位于：
 
 ```text
-packages/application/.../realtime_speech_to_text.py
-packages/adapters/speech_to_text/whisperlive_adapter.py
-apps/api/.../websockets/transcription.py
-apps/web/.../features/transcription/
+apps/api/src/ai_signal_api/modules/agent_assets/transcription.py
+apps/api/src/ai_signal_api/routers/agent_assets.py
+apps/web/src/features/agent/agent-screen.tsx
+vendor_tools/speech_to_text/whisperlive/adapter.py
 ```
 
 第三方工具升级不得改变上层 `TranscriptEvent` 契约。

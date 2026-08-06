@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   IconBolt,
+  IconAlertTriangle,
   IconCheck,
   IconHistory,
   IconX,
@@ -66,10 +67,36 @@ export default function RunsPage() {
             <article className="source-card" key={run.id}>
               <span className="source-icon"><IconHistory size={20} /></span>
               <div>
-                <strong>采集运行 · {run.items_added} 条新增</strong>
-                <small>{new Date(run.created_at).toLocaleString("zh-CN")}</small>
+                <strong>
+                  {run.task_id ? "任务运行" : "快速采集"} · {run.items_added} 条新增
+                </strong>
+                <small>
+                  {new Date(run.created_at).toLocaleString("zh-CN")} ·{" "}
+                  {run.trigger_type}
+                </small>
               </div>
-              <span className="run-ok"><IconCheck size={16} /> 已完成</span>
+              <span
+                className={
+                  run.execution_status === "completed" ? "run-ok" : "run-error"
+                }
+              >
+                {run.execution_status === "completed" ? (
+                  <><IconCheck size={16} /> 执行完成</>
+                ) : (
+                  <><IconX size={16} /> {run.execution_status}</>
+                )}
+              </span>
+              <span
+                className={
+                  run.coverage_status === "met" ? "run-ok" : "run-warning"
+                }
+              >
+                {run.coverage_status === "met" ? (
+                  <><IconCheck size={16} /> 覆盖达标</>
+                ) : (
+                  <><IconAlertTriangle size={16} /> 覆盖未达标</>
+                )}
+              </span>
             </article>
           ))}
         </div>

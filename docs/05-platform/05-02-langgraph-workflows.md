@@ -10,7 +10,8 @@
 - 需要 checkpoint、重试、回放的流程；
 - 跨 Capability 的编排。
 
-普通查询和单次编辑直接调用 Capability，不强制经过 Graph。
+普通 REST/UI 查询和单次编辑可直接调用 Capability。经自然语言 Agent 发起的简单
+请求仍进入同一轻量 Graph，但使用 Direct/Fast Plan，不调用无必要的 LLM Planner。
 
 ## 2. Graph 列表
 
@@ -63,6 +64,14 @@ plan
 → finalize
 ```
 
+生产实现必须使用 LangChain Agent 与 LangGraph `StateGraph`，不以关键词分支或自制
+Tool Loop 代替。Base + Domain 上下文装配、动态工具和节点定义见
+[02-03 Workspace Agent 上下文工程与动态工作流](../02-module-review-agent/02-03-agent-context-engineering-and-workflows.md)，
+最终 Context + Harness 取舍见
+[02-05 Workspace Agent 最终工程蓝图](../02-module-review-agent/02-05-final-agent-engineering-blueprint.md)，
+机器规格见
+[`02-agent-task-graph.yaml`](../../graph-specs/02-module-review-agent/02-agent-task-graph.yaml)。
+
 ## 3. State 规则
 
 State 只保存：
@@ -106,8 +115,13 @@ State 只保存：
 
 第一版：
 
-- 开发环境可使用 SQLite Checkpointer；
-- thread_id 使用业务 Run ID；
+- 本地单实例使用持久 SQLite Checkpointer，必须覆盖进程重启恢复、WAL、并发写入和
+  幂等副作用测试；
+- 内存 Checkpointer 只允许单元测试；
+- 未来明确采用多 API/Worker 实例时迁移为 PostgreSQL Checkpointer，不改变 Graph
+  State 和 Capability 契约；
+- Workspace Agent 的 `thread_id` 使用 Agent `turn_id`；采集、任务、卡片等业务 Run
+  只作为 Graph State 中的引用；
 - checkpoint_id 写入执行记录；
 - 对话长期记忆与 Graph checkpoint 分开管理。
 
@@ -130,4 +144,5 @@ State 只保存：
 
 - `graph-specs/01-module-timeline/01-collection-graph.yaml`；
 - `graph-specs/02-module-review-agent/02-review-graph.yaml`；
+- `graph-specs/02-module-review-agent/02-agent-task-graph.yaml`；
 - `graph-specs/04-module-poster-interop/04-poster-graph.yaml`。

@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
@@ -76,8 +78,18 @@ def query_timeline(
     search: str | None = Query(default=None),
     priority: Priority | None = Query(default=None),
     source_kind: SourceKind | None = Query(default=None),
+    source_id: list[str] = Query(default=[]),
+    topic: list[str] = Query(default=[]),
+    task_id: str | None = Query(default=None),
+    starred: bool | None = Query(default=None),
+    seen: bool | None = Query(default=None),
+    archived: bool | None = Query(default=None),
+    published_from: datetime | None = Query(default=None),
+    published_to: datetime | None = Query(default=None),
+    sort: str = Query(default="newest", pattern="^(newest|oldest)$"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    cursor: str | None = Query(default=None),
     session: Session = Depends(get_session),
 ) -> TimelinePage:
     result = build_capability_executor(
@@ -89,8 +101,18 @@ def query_timeline(
             search=search,
             priority=priority,
             source_kind=source_kind,
+            source_ids=source_id,
+            topics=topic,
+            task_id=task_id,
+            starred=starred,
+            seen=seen,
+            archived=archived,
+            published_from=published_from,
+            published_to=published_to,
+            sort=sort,
             limit=limit,
             offset=offset,
+            cursor=cursor,
         ),
         ExecutionContext(
             request_id=f"req_{uuid4().hex}",

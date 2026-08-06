@@ -13,7 +13,10 @@ from ai_signal_api.models import (
     AgentMessageModel,
 )
 from ai_signal_api.schemas import (
+    AgentConversationCreate,
+    AgentConversationPatch,
     AgentConversationRead,
+    AgentConversationSummary,
     AgentMessageRead,
     AgentRunRequest,
     AgentRunResponse,
@@ -33,6 +36,121 @@ class AgentConversationService:
 
     def read_current(self) -> AgentConversationRead:
         conversation = self._get_or_create_current()
+        return self._read(conversation)
+
+    def list(
+        self,
+        *,
+        scope: str = "active",
+        search: str | None = None,
+    ) -> list[AgentConversationSummary]:
+        query = select(AgentConversationModel)
+        if scope == "active":
+            query = query.where(
+                AgentConversationModel.status == "active",
+                AgentConversationModel.deleted_at.is_(None),
+            )
+        elif scope == "archived":
+            query = query.where(
+                AgentConversationModel.status == "archived",
+                AgentConversationModel.deleted_at.is_(None),
+            )
+        elif scope == "deleted":
+            query = query.where(
+                AgentConversationModel.deleted_at.is_not(None),
+            )
+        else:
+            raise ValueError("AGENT_CONVERSATION_SCOPE_INVALID")
+        normalized_search = (search or "").strip()
+        if normalized_search:
+            query = query.where(
+                AgentConversationModel.title.ilike(
+                    f"%{normalized_search}%"
+                )
+            )
+        query = query.order_by(
+            AgentConversationModel.pinned_at.is_(None),
+            AgentConversationModel.pinned_at.desc(),
+            AgentConversationModel.last_message_at.desc(),
+            AgentConversationModel.updated_at.desc(),
+            AgentConversationModel.id,
+        )
+        return [
+            AgentConversationSummary.model_validate(conversation)
+            for conversation in self.session.scalars(query)
+        ]
+
+    def create(
+        self,
+        payload: AgentConversationCreate,
+    ) -> AgentConversationRead:
+        title = payload.title.strip() if payload.title else "新对话"
+        conversation = AgentConversationModel(
+            title=title,
+            title_source="manual" if payload.title else "auto",
+        )
+        self.session.add(conversation)
+        self.session.commit()
+        return self._read(conversation)
+
+    def read(self, conversation_id: str) -> AgentConversationRead:
+        return self._read(self._get(conversation_id))
+
+    def update(
+        self,
+        conversation_id: str,
+        payload: AgentConversationPatch,
+    ) -> AgentConversationRead:
+        conversation = self._get(conversation_id)
+        values = payload.model_dump(exclude_unset=True)
+        if "title" in values and values["title"] is not None:
+            conversation.title = values["title"].strip()
+            conversation.title_source = "manual"
+        if "pinned" in values and values["pinned"] is not None:
+            conversation.pinned_at = (
+                datetime.now(timezone.utc)
+                if values["pinned"]
+                else None
+            )
+        self._touch(conversation)
+        self.session.commit()
+        return self._read(conversation)
+
+    def archive(self, conversation_id: str) -> AgentConversationRead:
+        conversation = self._get(conversation_id)
+        if conversation.deleted_at is None:
+            conversation.status = "archived"
+            conversation.archived_at = (
+                conversation.archived_at or datetime.now(timezone.utc)
+            )
+            self._touch(conversation)
+            self.session.commit()
+        return self._read(conversation)
+
+    def restore(self, conversation_id: str) -> AgentConversationRead:
+        conversation = self._get(conversation_id)
+        conversation.status = "active"
+        conversation.archived_at = None
+        conversation.deleted_at = None
+        conversation.unread = False
+        self._touch(conversation)
+        self.session.commit()
+        return self._read(conversation)
+
+    def soft_delete(self, conversation_id: str) -> AgentConversationRead:
+        conversation = self._get(conversation_id)
+        now = datetime.now(timezone.utc)
+        conversation.status = "archived"
+        conversation.archived_at = conversation.archived_at or now
+        conversation.deleted_at = conversation.deleted_at or now
+        self._touch(conversation)
+        self.session.commit()
+        return self._read(conversation)
+
+    def _read(
+        self,
+        conversation: AgentConversationModel,
+    ) -> AgentConversationRead:
         messages = list(
             self.session.scalars(
                 select(AgentMessageModel)
@@ -49,7 +167,14 @@ class AgentConversationService:
         return AgentConversationRead(
             id=conversation.id,
             title=conversation.title,
+            title_source=conversation.title_source,
             status=conversation.status,
+            pinned_at=conversation.pinned_at,
+            archived_at=conversation.archived_at,
+            deleted_at=conversation.deleted_at,
+            active_turn_id=conversation.active_turn_id,
+            last_message_at=conversation.last_message_at,
+            unread=conversation.unread,
             messages=[
                 AgentMessageRead.model_validate(message)
                 for message in messages
@@ -98,9 +223,15 @@ class AgentConversationService:
             client_message_id=client_message_id,
             request_id=request_id,
             image_count=len(payload.image_urls),
+            result_data={"artifact_ids": payload.artifact_ids},
         )
+        if (
+            conversation.title_source == "auto"
+            and conversation.last_message_at is None
+        ):
+            conversation.title = self._automatic_title(payload.message)
         self.session.add(user_message)
-        self._touch(conversation)
+        self._touch(conversation, message=True)
         self.session.commit()
 
         context = ExecutionContext(
@@ -166,14 +297,32 @@ class AgentConversationService:
     def _get_or_create_current(self) -> AgentConversationModel:
         conversation = self.session.scalar(
             select(AgentConversationModel)
-            .where(AgentConversationModel.status == "active")
-            .order_by(AgentConversationModel.updated_at.desc())
+            .where(
+                AgentConversationModel.status == "active",
+                AgentConversationModel.deleted_at.is_(None),
+            )
+            .order_by(
+                AgentConversationModel.last_message_at.desc(),
+                AgentConversationModel.updated_at.desc(),
+            )
         )
         if conversation is not None:
             return conversation
-        conversation = AgentConversationModel()
+        conversation = AgentConversationModel(
+            title="新对话",
+            title_source="auto",
+        )
         self.session.add(conversation)
         self.session.commit()
+        return conversation
+
+    def _get(self, conversation_id: str) -> AgentConversationModel:
+        conversation = self.session.get(
+            AgentConversationModel,
+            conversation_id,
+        )
+        if conversation is None:
+            raise LookupError("AGENT_CONVERSATION_NOT_FOUND")
         return conversation
 
     def _resolve_conversation(
@@ -182,11 +331,11 @@ class AgentConversationService:
     ) -> AgentConversationModel:
         if conversation_id is None:
             return self._get_or_create_current()
-        conversation = self.session.get(
-            AgentConversationModel,
-            conversation_id,
-        )
-        if conversation is None or conversation.status != "active":
+        conversation = self._get(conversation_id)
+        if (
+            conversation.status != "active"
+            or conversation.deleted_at is not None
+        ):
             raise LookupError("AGENT_CONVERSATION_NOT_FOUND")
         return conversation
 
@@ -213,19 +362,38 @@ class AgentConversationService:
                 if response.schedule_draft is not None
                 else None
             ),
+            task_draft=(
+                response.task_draft.model_dump(mode="json")
+                if response.task_draft is not None
+                else None
+            ),
             requested_model_id=response.requested_model_id,
             effective_model_id=response.effective_model_id,
             model_switched=response.model_switched,
             error_code=error_code,
         )
         self.session.add(assistant)
-        self._touch(conversation)
+        self._touch(conversation, message=True)
         self.session.commit()
         return assistant
 
     @staticmethod
-    def _touch(conversation: AgentConversationModel) -> None:
-        conversation.updated_at = datetime.now(timezone.utc)
+    def _touch(
+        conversation: AgentConversationModel,
+        *,
+        message: bool = False,
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        conversation.updated_at = now
+        if message:
+            conversation.last_message_at = now
+
+    @staticmethod
+    def _automatic_title(message: str) -> str:
+        normalized = " ".join(message.split())
+        if len(normalized) <= 28:
+            return normalized or "新对话"
+        return f"{normalized[:28].rstrip()}…"
 
     @staticmethod
     def _response_error_code(response: AgentRunResponse) -> str | None:
@@ -252,6 +420,7 @@ class AgentConversationService:
             capability_calls=assistant.capability_calls,
             result=assistant.result_data,
             schedule_draft=assistant.schedule_draft,
+            task_draft=assistant.task_draft,
             requested_model_id=assistant.requested_model_id,
             effective_model_id=assistant.effective_model_id,
             model_switched=assistant.model_switched,

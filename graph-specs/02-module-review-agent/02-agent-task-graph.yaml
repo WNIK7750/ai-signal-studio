@@ -1,0 +1,338 @@
+id: agent_task_graph
+version: 0.4.0
+workflow_version: 0.4.0
+status: target
+feature_flag: agent.langgraph_runtime
+schemas:
+  input: AgentTurnInputV1
+  state: AgentTaskStateV1
+  output: AgentTurnResultV1
+  state_schema_version: 1.0.0
+  plan_schema_version: 1.0.0
+  event_schema_version: 1.0.0
+  context_contract_version: 1.0.0
+runtime:
+  framework: langgraph
+  agent_framework: langchain
+  checkpointer:
+    local: sqlite
+    path: data/agent-checkpoints.db
+    multi_instance_future: postgresql
+  thread_id: turn_id
+  business_runs: references_in_state
+compatibility:
+  resume_requires_exact_workflow_version: true
+  unknown_state_schema: fail_with_actionable_error
+  checkpoint_migration: explicit_only
+execution_manifest:
+  fields:
+    - workflow_version
+    - state_schema_version
+    - plan_schema_version
+    - event_schema_version
+    - base_prompt_version
+    - domain_pack_versions
+    - tool_catalog_version
+    - model_config_ref
+    - capability_snapshot_digest
+domain_catalog:
+  version: 1.0.0
+  packs:
+    - collection
+    - intelligence
+    - tasking
+    - sources
+    - runs
+    - review
+    - cards
+    - agent_assets
+    - models
+    - agent
+  resolver:
+    max_active_domains_per_step: 3
+    max_tools_per_model_call: 8
+    disabled_capabilities_hidden: true
+    forged_disabled_calls_rejected: true
+budgets:
+  max_plan_steps: 5
+  max_active_domains_per_step: 3
+  max_tools_per_model_call: 8
+  max_tool_calls_per_step: 12
+  max_replans: 2
+  max_parallel_read_steps: 3
+  tool_result_inline_bytes: 8192
+runtime_controls:
+  turn_lease:
+    enabled: true
+    single_executor: true
+  cancellation:
+    checked_at: [N02, N10, N17, N18, N19]
+    preserve_completed_results: true
+  event_journal:
+    persist_before_stream: true
+    ordered_sequence: true
+    resumable: true
+  recovery:
+    scan_on_startup: true
+    states: [running, waiting_input, waiting_approval, stale]
+  finalizer:
+    always_runs: true
+    releases_turn_lease: true
+retry_profiles:
+  transient:
+    applies_to: [timeout, rate_limit, connection_error, provider_5xx]
+    max_attempts: 2
+    backoff: exponential_with_jitter
+  validation_or_policy:
+    applies_to: [invalid_input, schema_error, policy_denied, approval_rejected]
+    max_attempts: 0
+approval_token_contract:
+  fields:
+    - actor_id
+    - workspace_id
+    - turn_id
+    - step_id
+    - capability_id
+    - input_digest
+    - expires_at
+    - single_use
+    - consumed_at
+  edit_invalidates_token: true
+acceptance_policies:
+  - information_results.v1
+  - capability_effect.v1
+  - artifact_created.v1
+planning_modes:
+  direct:
+    source: deterministic
+    uses_llm_planner: false
+  fast:
+    source: structured_client_input
+    uses_llm_planner: false
+  dynamic:
+    source: natural_language
+    uses_llm_planner: true
+nodes:
+  - id: N01
+    name: accept_turn
+    owner: agent
+  - id: N02
+    name: supervise_run
+    owner: agent_runtime
+    responsibilities: [lease, idempotency, budget, cancellation, execution_manifest]
+  - id: N03
+    name: normalize_input
+    owner: agent_runtime
+  - id: N04
+    name: bootstrap_context
+    owner: agent_runtime
+    context_layers: [base, workspace_policy, agent_pack, capability_snapshot, domain_index]
+  - id: N05
+    name: route_complexity
+    owner: agent_runtime
+  - id: N06
+    name: build_fast_plan
+    owner: agent_runtime
+    implementation: deterministic
+  - id: N07
+    name: build_structured_plan
+    owner: agent_runtime
+    implementation: langchain_structured_output
+  - id: N08
+    name: validate_plan
+    owner: agent_runtime
+  - id: N09
+    name: clarify_and_wait
+    owner: agent_runtime
+    implementation: langgraph_interrupt
+  - id: N10
+    name: schedule_ready_steps
+    owner: agent_runtime
+    implementation: langgraph_send
+  - id: N11
+    name: assemble_step_context_and_tools
+    owner: agent_runtime
+    context_layers: [base, workspace_policy, conversation, domain, task_step, evidence, tool_schema]
+  - id: N12
+    name: bind_action
+    owner: agent_runtime
+    output: ActionEnvelopeV1
+  - id: N13
+    name: validate_action
+    owner: module_domain
+    implementation: pydantic_and_domain_validator
+  - id: N14
+    name: capability_policy_gate
+    owner: capabilities
+  - id: N15
+    name: approve_and_wait
+    owner: capabilities
+    implementation: langgraph_interrupt
+  - id: N16
+    name: route_executor
+    owner: agent_runtime
+  - id: N17
+    name: execute_capability
+    owner: capabilities
+  - id: N18
+    name: execute_bounded_domain_agent
+    owner: module_domain
+    implementation: langchain_create_agent
+  - id: N19
+    name: execute_domain_workflow
+    owner: module_domain
+    implementation: langgraph_subgraph_or_parallel_map
+  - id: N20
+    name: record_event_evidence_artifact
+    owner: agent_runtime
+    persist_before_continue: true
+  - id: N21
+    name: join_results
+    owner: agent_runtime
+  - id: N22
+    name: inspect_outcome
+    owner: agent_runtime
+    evaluation_order: [schema, resource_refs, acceptance_policy, optional_quality_judge]
+  - id: N23
+    name: control_retry_replan_budget
+    owner: agent_runtime
+  - id: N24
+    name: compose_result
+    owner: agent
+  - id: N25
+    name: finalize_outcome
+    owner: agent_runtime
+    terminal_statuses: [complete, partial, failed, cancelled]
+edges:
+  - [N01, N02]
+  - [N02, N03]
+  - [N03, N04]
+  - [N04, N05]
+  - from: N05
+    to: N06
+    when: direct_or_atomic
+  - from: N05
+    to: N07
+    when: complex_or_ambiguous
+  - [N06, N08]
+  - [N07, N08]
+  - from: N08
+    to: N09
+    when: missing_required_input
+  - from: N09
+    to: N05
+    when: resumed
+  - from: N08
+    to: N10
+    when: valid
+  - from: N08
+    to: N23
+    when: invalid_or_repairable
+  - from: N10
+    to: N11
+    when: ready_steps
+  - from: N10
+    to: N24
+    when: cancel_requested
+  - [N11, N12]
+  - [N12, N13]
+  - from: N13
+    to: N23
+    when: invalid
+  - from: N13
+    to: N14
+    when: valid
+  - from: N14
+    to: N16
+    when: allowed
+  - from: N14
+    to: N15
+    when: approval_required
+  - from: N14
+    to: N20
+    when: denied
+  - from: N15
+    to: N12
+    when: approved_or_edited
+  - from: N15
+    to: N20
+    when: rejected
+  - from: N16
+    to: N17
+    when: atomic_capability
+  - from: N16
+    to: N18
+    when: bounded_agentic_step
+  - from: N16
+    to: N19
+    when: known_domain_workflow
+  - [N17, N20]
+  - [N18, N20]
+  - [N19, N20]
+  - [N20, N21]
+  - [N21, N22]
+  - from: N22
+    to: N10
+    when: next_runnable_steps
+  - from: N22
+    to: N23
+    when: repairable
+  - from: N22
+    to: N09
+    when: user_input_required
+  - from: N22
+    to: N24
+    when: finish
+  - from: N23
+    to: N16
+    when: retry_action
+  - from: N23
+    to: N12
+    when: rebind
+  - from: N23
+    to: N07
+    when: replan
+  - from: N23
+    to: N24
+    when: budget_exhausted
+  - [N24, N25]
+interrupt_nodes: [N09, N15]
+waiting_status_projection:
+  N09: waiting_input
+  N15: waiting_approval
+checkpoint_after: [N04, N08, N09, N15, N17, N18, N19, N20, N21, N24, N25]
+side_effect_nodes: [N17, N18, N19]
+idempotency:
+  key: turn_id + step_id + capability_id + canonical_input_digest
+artifacts:
+  graph_state_contains_references_only: true
+  large_result_storage: business_store_or_artifact_store
+stream:
+  projection: AgentTurnEventV1
+  ordered_sequence: true
+  resumable: true
+security:
+  external_evidence_untrusted: true
+  capability_gate_is_authoritative: true
+  secrets_in_model_context: false
+  hidden_reasoning_persisted: false
+observability:
+  local_trace_sink_required: true
+  langsmith_optional: true
+  opentelemetry_exporter_optional: true
+degraded_mode:
+  deterministic_ui_and_rest_actions_available: true
+  natural_language_agent_success_must_not_be_simulated: true
+documentation:
+  blueprint: docs/02-module-review-agent/02-05-final-agent-engineering-blueprint.md
+  context_design: docs/02-module-review-agent/02-03-agent-context-engineering-and-workflows.md
+  history: docs/02-module-review-agent/02-04-agent-workflow-history.md
+  tasks: docs/07-delivery/07-04-optimization-implementation-status.md
+  figma: https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad
+implementation_sync:
+  date: 2026-08-06
+  workflow_version: 0.4.0
+  figma_node: "3:304"
+  evidence:
+    - tests/modules/agent_runtime/test_context.py
+    - tests/evals/agent/test_release_eval_harness.py

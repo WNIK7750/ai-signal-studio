@@ -1,0 +1,14 @@
+id: cards
+version: 1.0.0
+title: 卡片与海报
+description: 编辑已生成卡片，并将确认后的修订版本渲染为本地 PNG Artifact
+capabilities:
+  - card.list
+  - card.get
+  - poster.draft.generate
+  - poster.card.update
+  - poster.card.render
+result_blocks:
+  - artifact_list
+  - navigation
+  - partial_failure

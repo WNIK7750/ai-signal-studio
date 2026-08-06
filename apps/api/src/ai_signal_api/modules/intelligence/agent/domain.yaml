@@ -1,0 +1,23 @@
+id: intelligence
+version: 1.0.0
+title: AI 信息库
+description: 查询、筛选和推荐真实保存的 AI 信息
+capabilities:
+  - intelligence.timeline.query
+  - intelligence.recommend
+  - information.state.update
+  - research.filter
+  - research.recommend
+  - research.match_requirements
+  - research.compare
+  - research.trend_brief
+  - research.coverage_gap
+result_blocks:
+  - signal_preview
+  - information_list
+  - recommendation_list
+  - comparison_table
+  - trend_summary
+  - evidence_sources
+  - partial_failure
+  - navigation_action

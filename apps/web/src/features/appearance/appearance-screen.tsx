@@ -1,40 +1,16 @@
 "use client";
 
 import { IconCheck, IconMoon, IconPalette, IconSun } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { useAppearance } from "@/components/appearance-provider";
 import { StatusMark } from "@/components/status-mark";
-import { clampToken, ThemeId, themePresets } from "@/lib/themes";
+import { clampToken, type ThemeId, themePresets } from "@/lib/themes";
 
 export function AppearanceScreen() {
-  const [theme, setTheme] = useState<ThemeId>("signal-light");
-  const [radius, setRadius] = useState(10);
-  const [density, setDensity] = useState(12);
-  const [fontSize, setFontSize] = useState(15);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const stored = localStorage.getItem("ai-signal-theme") as ThemeId | null;
-      if (stored && themePresets.some((item) => item.id === stored)) {
-        setTheme(stored);
-      }
-      setRadius(Number(localStorage.getItem("ai-signal-radius") ?? 10));
-      setDensity(Number(localStorage.getItem("ai-signal-density") ?? 12));
-      setFontSize(Number(localStorage.getItem("ai-signal-font-size") ?? 15));
-    });
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.setProperty("--radius", `${radius}px`);
-    document.documentElement.style.setProperty("--density", `${density}px`);
-    document.documentElement.style.setProperty("--base-font-size", `${fontSize}px`);
-    localStorage.setItem("ai-signal-theme", theme);
-    localStorage.setItem("ai-signal-radius", String(radius));
-    localStorage.setItem("ai-signal-density", String(density));
-    localStorage.setItem("ai-signal-font-size", String(fontSize));
-  }, [density, fontSize, radius, theme]);
+  const {
+    appearance: { theme, radius, density, fontSize },
+    updateAppearance,
+  } = useAppearance();
 
   return (
     <AppShell>
@@ -60,7 +36,7 @@ export function AppearanceScreen() {
             <button
               key={preset.id}
               className={`theme-card ${theme === preset.id ? "selected" : ""}`}
-              onClick={() => setTheme(preset.id)}
+              onClick={() => updateAppearance({ theme: preset.id })}
             >
               <span className="theme-preview" style={{ background: preset.colors[1] }}>
                 <span style={{ background: preset.colors[0] }} />
@@ -85,7 +61,9 @@ export function AppearanceScreen() {
               min={4}
               max={20}
               suffix="px"
-              onChange={(value) => setRadius(clampToken(value, 4, 20))}
+              onChange={(value) =>
+                updateAppearance({ radius: clampToken(value, 4, 20) })
+              }
             />
             <TokenSlider
               label="间距"
@@ -93,7 +71,9 @@ export function AppearanceScreen() {
               min={8}
               max={20}
               suffix="px"
-              onChange={(value) => setDensity(clampToken(value, 8, 20))}
+              onChange={(value) =>
+                updateAppearance({ density: clampToken(value, 8, 20) })
+              }
             />
             <TokenSlider
               label="字号"
@@ -101,11 +81,18 @@ export function AppearanceScreen() {
               min={13}
               max={18}
               suffix="px"
-              onChange={(value) => setFontSize(clampToken(value, 13, 18))}
+              onChange={(value) =>
+                updateAppearance({ fontSize: clampToken(value, 13, 18) })
+              }
             />
             <label className="select-control">
               界面模式
-              <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeId)}>
+              <select
+                value={theme}
+                onChange={(event) =>
+                  updateAppearance({ theme: event.target.value as ThemeId })
+                }
+              >
                 {themePresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
               </select>
             </label>

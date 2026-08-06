@@ -1,0 +1,13 @@
+id: agent
+version: 1.0.0
+title: 会话与外观
+description: 管理本地 Agent 会话并返回受控外观动作
+capabilities:
+  - conversation.list
+  - conversation.update
+  - conversation.archive
+  - conversation.restore
+  - appearance.set
+result_blocks:
+  - navigation_action
+  - partial_failure

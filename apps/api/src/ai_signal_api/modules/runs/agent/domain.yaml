@@ -1,0 +1,11 @@
+id: runs
+version: 1.0.0
+title: 运行诊断
+description: 查询采集运行及其稳定诊断
+capabilities:
+  - run.list
+  - run.get
+result_blocks:
+  - evidence_sources
+  - partial_failure
+  - navigation_action

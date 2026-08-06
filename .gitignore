@@ -4,13 +4,21 @@
 !.env.example
 config/*.local.json
 config/**/*.local.json
+**/config/*.local.json
+**/config/**/*.local.json
 *.pem
+*.key
 *.p12
 *.pfx
 
 # Runtime data and logs
 data/
 logs/
+artifacts/
+uploads/
+exports/
+backups/
+agent-packs/local/
 *.db
 *.db-*
 *.sqlite
@@ -56,6 +64,11 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+**/.auth/
+*.har
+trace.zip
+storage-state*.json
+cookies*.json
 
 # Editor and operating-system files
 .idea/

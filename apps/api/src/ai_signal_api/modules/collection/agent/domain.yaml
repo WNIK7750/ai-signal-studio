@@ -1,0 +1,9 @@
+id: collection
+version: 1.0.0
+title: 信息采集
+description: 从已启用来源采集 AI 信息并保留逐来源错误
+capabilities:
+  - collection.run.start
+result_blocks:
+  - collection_summary
+  - partial_failure

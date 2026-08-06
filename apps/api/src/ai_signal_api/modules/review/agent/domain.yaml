@@ -1,0 +1,10 @@
+id: review
+version: 1.0.0
+title: 审核
+description: 查询和提交待处理信息的审核决定
+capabilities:
+  - review.batch.submit
+result_blocks:
+  - information_list
+  - navigation_action
+  - partial_failure

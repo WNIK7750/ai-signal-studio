@@ -6,6 +6,9 @@ import {
   IconCalendarMonth,
   IconChevronLeft,
   IconChevronRight,
+  IconCheck,
+  IconDownload,
+  IconEdit,
   IconExternalLink,
   IconLayoutSidebarLeftCollapse,
   IconRefresh,
@@ -14,7 +17,13 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { StatusMark } from "@/components/status-mark";
-import { api, CardItem, SourceKind } from "@/lib/api";
+import {
+  api,
+  artifactContentUrl,
+  CardItem,
+  PosterWorkflow,
+  SourceKind,
+} from "@/lib/api";
 import { Priority } from "@/lib/priority";
 import { buildMonthDays, monthValue } from "./date-tabs";
 
@@ -78,6 +87,16 @@ export function CardsScreen() {
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [maxChars, setMaxChars] = useState(400);
+  const [posterWorkflow, setPosterWorkflow] =
+    useState<PosterWorkflow | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<{
+    title: string;
+    summary: string;
+    keyPoints: string;
+    templateId: CardItem["template_id"];
+    coverSource: CardItem["cover_source"];
+  } | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const days = useMemo(() => buildMonthDays(month), [month]);
   const params = useMemo(() => {
@@ -98,12 +117,45 @@ export function CardsScreen() {
     queryFn: () => api.cards(),
   });
   const generate = useMutation({
-    mutationFn: () => api.generateCards(maxChars),
+    mutationFn: () => api.startPosterWorkflow(maxChars),
+    onSuccess: setPosterWorkflow,
+  });
+  const resumePoster = useMutation({
+    mutationFn: (approved: boolean) =>
+      api.resumePosterWorkflow(posterWorkflow!.thread_id, approved),
     onSuccess: async (result) => {
+      setPosterWorkflow(result);
       setDay("");
       await queryClient.invalidateQueries({ queryKey: ["cards"] });
       setSelectedId((current) => current ?? result.card_ids[0] ?? null);
+      if (result.status !== "waiting_approval") {
+        setPosterWorkflow(null);
+      }
     },
+  });
+  const updateCard = useMutation({
+    mutationFn: () =>
+      api.updateCard(selected!.id, {
+        expected_revision: selected!.revision,
+        title: editDraft!.title,
+        summary: editDraft!.summary,
+        key_points: editDraft!.keyPoints
+          .split("\n")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        template_id: editDraft!.templateId,
+        cover_source: editDraft!.coverSource,
+      }),
+    onSuccess: async () => {
+      setEditing(false);
+      setEditDraft(null);
+      await queryClient.invalidateQueries({ queryKey: ["cards"] });
+    },
+  });
+  const renderOne = useMutation({
+    mutationFn: (cardId: string) => api.renderCard(cardId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["cards"] }),
   });
   const items = cards.data?.items ?? [];
   const selected =
@@ -180,6 +232,40 @@ export function CardsScreen() {
           selected ? "detail-open" : ""
         }`}
       >
+        {posterWorkflow?.interrupt?.phase ===
+          "confirm_draft_generation" && (
+          <div className="modal-backdrop">
+            <div
+              className="modal poster-confirm-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="poster-confirm-title"
+            >
+              <span className="eyebrow">Poster Graph</span>
+              <h2 id="poster-confirm-title">确认生成卡片草稿？</h2>
+              <p>{posterWorkflow.interrupt.message}</p>
+              <div>
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    resumePoster.mutate(false);
+                    setPosterWorkflow(null);
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  className="primary-button"
+                  onClick={() => resumePoster.mutate(true)}
+                  disabled={resumePoster.isPending}
+                >
+                  <IconCheck size={16} />
+                  生成草稿
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <aside className="cards-filters" aria-label="卡片筛选">
           <div className="cards-filter-heading">
             <strong>筛选</strong>
@@ -304,6 +390,22 @@ export function CardsScreen() {
               {generate.isPending ? "生成中" : "生成卡片"}
             </button>
           </div>
+          {posterWorkflow?.interrupt?.phase === "confirm_render" && (
+            <div className="poster-render-banner" role="status">
+              <div>
+                <strong>草稿已保存</strong>
+                <span>可先编辑卡片，再确认批量渲染 PNG。</span>
+              </div>
+              <button
+                className="primary-button"
+                onClick={() => resumePoster.mutate(true)}
+                disabled={resumePoster.isPending}
+              >
+                <IconDownload size={16} />
+                确认渲染
+              </button>
+            </div>
+          )}
 
           {cards.isLoading && (
             <div className="empty-state">正在读取卡片…</div>
@@ -350,7 +452,113 @@ export function CardsScreen() {
               </button>
             </div>
             <CoverSurface card={selected} detail />
-            <h2>{selected.title}</h2>
+            {editing && editDraft ? (
+              <form
+                className="card-edit-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  updateCard.mutate();
+                }}
+              >
+                <label>
+                  标题
+                  <input
+                    value={editDraft.title}
+                    onChange={(event) =>
+                      setEditDraft({
+                        ...editDraft,
+                        title: event.target.value,
+                      })
+                    }
+                    maxLength={500}
+                    required
+                  />
+                </label>
+                <label>
+                  摘要（100～1000 字）
+                  <textarea
+                    value={editDraft.summary}
+                    onChange={(event) =>
+                      setEditDraft({
+                        ...editDraft,
+                        summary: event.target.value,
+                      })
+                    }
+                    minLength={100}
+                    maxLength={1000}
+                    required
+                  />
+                </label>
+                <label>
+                  要点（每行一条）
+                  <textarea
+                    value={editDraft.keyPoints}
+                    onChange={(event) =>
+                      setEditDraft({
+                        ...editDraft,
+                        keyPoints: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  模板
+                  <select
+                    value={editDraft.templateId}
+                    onChange={(event) =>
+                      setEditDraft({
+                        ...editDraft,
+                        templateId: event.target
+                          .value as CardItem["template_id"],
+                      })
+                    }
+                  >
+                    <option value="offline-quote">引语底板</option>
+                    <option value="offline-grid">网格底板</option>
+                    {selected.cover_url && (
+                      <option value="source-cover">来源封面</option>
+                    )}
+                  </select>
+                </label>
+                <div>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setEditing(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={updateCard.isPending}
+                  >
+                    保存编辑
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="card-detail-title-row">
+                  <h2>{selected.title}</h2>
+                  <button
+                    className="icon-button"
+                    onClick={() => {
+                      setEditDraft({
+                        title: selected.title,
+                        summary: selected.summary,
+                        keyPoints: selected.key_points.join("\n"),
+                        templateId: selected.template_id,
+                        coverSource: selected.cover_source,
+                      });
+                      setEditing(true);
+                    }}
+                    aria-label={`编辑 ${selected.title}`}
+                  >
+                    <IconEdit size={17} />
+                  </button>
+                </div>
             <div className="card-detail-meta">
               <span>{selected.source_name}</span>
               <time>
@@ -377,6 +585,25 @@ export function CardsScreen() {
                 <span key={value}>{value}</span>
               ))}
             </div>
+            {selected.rendered_artifact_id ? (
+              <a
+                className="secondary-button"
+                href={artifactContentUrl(selected.rendered_artifact_id)}
+                download
+              >
+                <IconDownload size={16} />
+                下载 PNG
+              </a>
+            ) : (
+              <button
+                className="secondary-button"
+                onClick={() => renderOne.mutate(selected.id)}
+                disabled={renderOne.isPending}
+              >
+                <IconDownload size={16} />
+                渲染当前卡片
+              </button>
+            )}
             <a
               className="primary-button card-source-link"
               href={selected.canonical_url}
@@ -386,6 +613,8 @@ export function CardsScreen() {
               查看原始信息
               <IconExternalLink size={17} />
             </a>
+              </>
+            )}
           </aside>
         )}
       </div>

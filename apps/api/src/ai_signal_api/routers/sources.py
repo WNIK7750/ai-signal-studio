@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,7 @@ from ai_signal_api.schemas import (
     SourceCreate,
     SourcePatch,
     SourceRead,
+    SourceTestRead,
 )
 
 
@@ -42,6 +44,16 @@ def create_source(
     return SourceRead.model_validate(source)
 
 
+@router.post("/test-definition", response_model=SourceTestRead)
+def test_source_definition(
+    payload: SourceCreate,
+    session: Session = Depends(get_session),
+) -> SourceTestRead:
+    return SourceTestRead.model_validate(
+        SourceService(session).test_definition(payload)
+    )
+
+
 @router.patch("/{source_id}", response_model=SourceRead)
 def patch_source(
     source_id: str,
@@ -55,5 +67,28 @@ def patch_source(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=str(error),
+        ) from error
+    except IntegrityError as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="SOURCE_NAME_EXISTS",
+        ) from error
     return SourceRead.model_validate(source)
 
+
+@router.post("/{source_id}/test", response_model=SourceTestRead)
+def test_source(
+    source_id: str,
+    session: Session = Depends(get_session),
+) -> SourceTestRead:
+    try:
+        return SourceTestRead.model_validate(
+            SourceService(session).test(source_id)
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error

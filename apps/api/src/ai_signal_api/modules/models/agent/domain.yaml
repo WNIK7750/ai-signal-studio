@@ -1,0 +1,10 @@
+id: models
+version: 1.0.0
+title: 模型配置
+description: 查询脱敏模型配置并为当前会话选择模型
+capabilities:
+  - model.list
+  - model.select
+result_blocks:
+  - navigation_action
+  - partial_failure

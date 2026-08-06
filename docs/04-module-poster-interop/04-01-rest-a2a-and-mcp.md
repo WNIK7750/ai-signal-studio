@@ -4,6 +4,11 @@
 
 三种协议都是 Capability 的 Adapter，不实现独立业务规则。
 
+当前实施决策见
+[04-02 外部 Agent Gateway 设计](04-02-external-agent-gateway-design.md)：REST/OpenAPI
+继续作为事实接口；MCP 是未来首个本机入口；A2A 等明确的长任务互操作需求出现后再做。
+外部 Gateway 当前为设计项，不在开发队列中。
+
 ## 2. REST / OpenAPI
 
 供前端、脚本与普通集成使用。
@@ -89,10 +94,15 @@ prepare_poster_drafts
 
 ## 6. 外部 Agent 权限
 
-外部 Agent 使用独立 actor_type、凭据和 Capability Policy。默认：
+外部 Agent 使用独立 `actor_type=external_agent`、凭据和 Capability Policy。服务端总
+开关默认关闭，能力默认拒绝，只有显式白名单可以开放。未来第一切片只允许安全的只读
+查询；写能力必须在审批、幂等和审计稳定后逐项开放。
 
-- 可以创建采集任务；
-- 可以查询自己创建的任务；
+目标约束：
+
+- 可以查询允许范围内的信息；
+- 可以查询自己创建的任务和运行；
+- 经显式授权与审批后才可以创建采集任务；
 - 不能物理删除；
 - 不能绕过卡片生成/发布确认；
 - 不能直接修改长期正式记忆。

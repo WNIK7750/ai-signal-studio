@@ -45,6 +45,14 @@ poster.card.render:
 
 不要把全部 Tool 永久绑定给模型后再在 Tool 内静默拒绝；优先只暴露当前可用 Tool，同时仍在执行层做二次校验。
 
+生产装配使用 LangChain Agent Middleware/Structured Tool 和 LangGraph StateGraph。
+模型先看到轻量 Domain Index，选定计划步骤后才加载模块自己的 Domain Prompt、
+Tool Guidance 和 Tool Schema。完整契约见
+[02-05 Workspace Agent 最终工程蓝图](02-05-final-agent-engineering-blueprint.md)和
+[02-03 Workspace Agent 上下文工程与动态工作流](02-03-agent-context-engineering-and-workflows.md)。
+OpenAI Responses 或其他 Provider 的原生 Tool Search 只能作为节省 Token 的优化，
+不能替代本地 Capability Policy。
+
 ## 4. Agent 的职责
 
 Agent 负责：
@@ -94,3 +102,18 @@ Agent 不负责：
 - 模型配置；
 - System Prompt 摘要；
 - 开关与审批策略摘要。
+
+## 8. 当前运行增量
+
+`workflow_version=0.4.0` 的首个生产切片已使用真实 LangChain/LangGraph：
+
+- Bootstrap 只带版本化 Base、Capability Snapshot 和 Domain Index；
+- 当前步骤才加载 `collection` 或 `intelligence` Domain Prompt 与 Tool Schema；
+- `collection.run.start`、`intelligence.timeline.query` 和
+  `intelligence.recommend` 通过 LangChain Structured Tool 进入同一
+  Capability Executor；
+- 禁用能力不会进入步骤 Tool 集合，执行层仍做权威二次拒绝；
+- OpenAI-compatible 工作区模型由 `langchain-openai` 适配；Demo/测试工作区使用
+  明确的 Fake Chat Model，仍经过真实 Planner、StateGraph、Tool 和 Capability 路径。
+
+其他 Domain、审批 Token 和站内写能力仍按 `07-04` 后续切片扩展。

@@ -1,0 +1,11 @@
+id: agent_assets
+version: 1.0.0
+title: Agent Pack 与 Artifact
+description: 按需检索已激活的长期记忆和本地 Artifact
+capabilities:
+  - agent_pack.search
+  - artifact.search
+result_blocks:
+  - evidence_sources
+  - artifact_list
+  - partial_failure

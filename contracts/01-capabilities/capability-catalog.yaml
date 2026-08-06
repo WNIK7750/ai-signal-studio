@@ -32,6 +32,38 @@ capabilities:
       mcp_tool: true
       a2a_skill: false
 
+  - id: intelligence.recommend
+    version: 1.0.0
+    title: Recommend saved intelligence with traceable references
+    input_schema: information-recommend-input-v1
+    output_schema: information-recommend-result-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [intelligence:read]
+    dependencies: [intelligence.timeline.query]
+    interfaces:
+      rest: false
+      langchain_tool: true
+      mcp_tool: false
+      a2a_skill: false
+
+  - id: task.run.start
+    version: 1.0.0
+    title: Run an immutable collection task version
+    input_schema: task-run-start-input-v1
+    output_schema: task-run-v1
+    side_effect: external
+    risk_level: low
+    approval: never
+    required_scopes: [tasks:write]
+    dependencies: [collection.run.start]
+    interfaces:
+      rest: true
+      langchain_tool: true
+      mcp_tool: false
+      a2a_skill: false
+
   - id: review.batch.submit
     version: 1.0.0
     title: Submit review decisions
@@ -95,3 +127,255 @@ capabilities:
       langchain_tool: false
       mcp_tool: false
       a2a_skill: false
+
+  - id: agent_pack.search
+    version: 1.0.0
+    title: Search the active local Agent Pack
+    input_schema: agent-pack-search-input-v1
+    output_schema: agent-pack-search-result-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [agent-pack:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: artifact.search
+    version: 1.0.0
+    title: Search local Artifact references
+    input_schema: artifact-search-input-v1
+    output_schema: artifact-search-result-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [artifact:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: source.list
+    version: 1.0.0
+    title: List source configurations
+    input_schema: empty-input-v1
+    output_schema: source-list-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [sources:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: source.test
+    version: 1.0.0
+    title: Test a source through the safe network adapter
+    input_schema: source-test-input-v1
+    output_schema: source-test-result-v1
+    side_effect: external
+    risk_level: low
+    approval: never
+    required_scopes: [sources:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: source.update
+    version: 1.0.0
+    title: Update a source definition
+    input_schema: source-update-input-v1
+    output_schema: source-v1
+    side_effect: write
+    risk_level: medium
+    approval: policy
+    required_scopes: [sources:write]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: task.list
+    version: 1.0.0
+    title: List collection tasks
+    input_schema: empty-input-v1
+    output_schema: task-list-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [tasks:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: task.get
+    version: 1.0.0
+    title: Read a versioned collection task
+    input_schema: task-get-input-v1
+    output_schema: task-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [tasks:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: task.update
+    version: 1.0.0
+    title: Update a task and create a new immutable version
+    input_schema: task-update-input-v1
+    output_schema: task-v1
+    side_effect: write
+    risk_level: medium
+    approval: policy
+    required_scopes: [tasks:write]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: run.list
+    version: 1.0.0
+    title: List collection runs
+    input_schema: run-list-input-v1
+    output_schema: run-list-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [runs:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: run.get
+    version: 1.0.0
+    title: Read a collection run diagnostic
+    input_schema: run-get-input-v1
+    output_schema: collection-run-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [runs:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: card.list
+    version: 1.0.0
+    title: Query generated cards
+    input_schema: card-query-input-v1
+    output_schema: card-page-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [cards:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: card.get
+    version: 1.0.0
+    title: Read a generated card
+    input_schema: card-get-input-v1
+    output_schema: card-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [cards:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: poster.card.update
+    version: 1.0.0
+    title: Edit a card revision before rendering
+    input_schema: card-update-input-v1
+    output_schema: card-v1
+    side_effect: write
+    risk_level: medium
+    approval: policy
+    required_scopes: [cards:write]
+    dependencies: [poster.draft.generate]
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: information.state.update
+    version: 1.0.0
+    title: Update seen starred archived or note state
+    input_schema: information-state-update-input-v1
+    output_schema: information-state-v1
+    side_effect: write
+    risk_level: low
+    approval: policy
+    required_scopes: [intelligence:write]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: model.list
+    version: 1.0.0
+    title: List redacted model configurations
+    input_schema: empty-input-v1
+    output_schema: model-list-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [models:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: model.select
+    version: 1.0.0
+    title: Select a configured model for the current conversation
+    input_schema: model-selection-input-v1
+    output_schema: client-action-v1
+    side_effect: client_action
+    risk_level: low
+    approval: never
+    required_scopes: [models:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: conversation.list
+    version: 1.0.0
+    title: List local Agent conversations
+    input_schema: conversation-list-input-v1
+    output_schema: conversation-list-v1
+    side_effect: read
+    risk_level: low
+    approval: never
+    required_scopes: [conversations:read]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: conversation.update
+    version: 1.0.0
+    title: Rename or pin a local Agent conversation
+    input_schema: conversation-update-input-v1
+    output_schema: conversation-v1
+    side_effect: write
+    risk_level: low
+    approval: never
+    required_scopes: [conversations:write]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: conversation.archive
+    version: 1.0.0
+    title: Archive a local Agent conversation
+    input_schema: conversation-id-input-v1
+    output_schema: conversation-v1
+    side_effect: write
+    risk_level: low
+    approval: never
+    required_scopes: [conversations:write]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: conversation.restore
+    version: 1.0.0
+    title: Restore a local Agent conversation
+    input_schema: conversation-id-input-v1
+    output_schema: conversation-v1
+    side_effect: write
+    risk_level: low
+    approval: never
+    required_scopes: [conversations:write]
+    dependencies: []
+    interfaces: {rest: true, langchain_tool: true, mcp_tool: false, a2a_skill: false}
+
+  - id: appearance.set
+    version: 1.0.0
+    title: Return a controlled appearance client action
+    input_schema: appearance-action-input-v1
+    output_schema: client-action-v1
+    side_effect: client_action
+    risk_level: low
+    approval: never
+    required_scopes: [appearance:write]
+    dependencies: []
+    interfaces: {rest: false, langchain_tool: true, mcp_tool: false, a2a_skill: false}

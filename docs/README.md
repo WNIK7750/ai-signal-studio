@@ -15,15 +15,19 @@
 ### 01～04 交付模块
 
 1. [01 AI 情报时间线](01-module-timeline/01-00-overview.md)
-2. [02 审核工作台与 Workspace Agent](02-module-review-agent/02-00-overview.md)
+2. [02 审核工作台与 Workspace Agent](02-module-review-agent/02-00-overview.md)：对话、
+   Base + Domain 上下文工程、轻量 Harness、LangChain/LangGraph 工作流与历史图谱。
 3. [03 Agent Pack、Artifact 与实时转写](03-module-agent-assets-stt/03-00-overview.md)
-4. [04 信息卡片与后续外部接口](04-module-poster-interop/04-00-overview.md)
+4. [04 信息卡片与后续外部接口](04-module-poster-interop/04-00-overview.md)：卡片成品、
+   REST/OpenAPI 与延后实施的[外部 Agent Gateway 设计](04-module-poster-interop/04-02-external-agent-gateway-design.md)。
 
 ### 05～07 共享规范与交付
 
 - [05 共享平台](05-platform/05-01-capability-contract.md)：Capability、LangGraph、前端架构、UI 布局、设计令牌、主题、图标与[模型路由](05-platform/05-07-model-configuration-and-routing.md)。
 - [06 质量与运维](06-quality-operations/06-01-simple-tdd-and-testing.md)：测试、可观测性、安全与审批。
-- [07 交付管理](07-delivery/07-01-development-roadmap.md)：路线图与实践来源。
+- [07 交付管理](07-delivery/07-01-development-roadmap.md)：路线图、实践来源与
+  [产品、业务及体验全面优化蓝图](07-delivery/07-03-product-and-experience-optimization-blueprint.md)，
+  以及[当前实现、验收状态与新增任务](07-delivery/07-04-optimization-implementation-status.md)。
 
 ### 90～99 决策与参考
 

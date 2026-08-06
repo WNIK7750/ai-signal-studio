@@ -60,8 +60,35 @@
 - 功能入口使用统一 Tabler Outline 前缀图标和可见文字；纯图标按钮必须有可访问名称。
 - 不要堆叠“卡片里的卡片”，不要用大面积渐变、装饰性 Hero 或无意义动效遮挡主要工作流。
 
+## Agent 工作流图谱同步
+
+- Agent 任务先读
+  `docs/02-module-review-agent/02-05-final-agent-engineering-blueprint.md`；它是当前 Context、
+  Harness、Evidence、评测和项目体量取舍的指导基线。
+- 生产 Workspace Agent 必须使用真实 LangChain Agent 与 LangGraph 工作流；不要用关键词
+  分支或自制 Tool Loop 冒充目标 Agent Runtime。
+- 任何改变 Workspace Agent 工作流拓扑、Base/Domain 上下文装配、Domain 路由、工具
+  加载、Planner、Executor、Result Inspector、审批、失败继续或结果合并的任务，都必须
+  在同一增量中同步：
+  - `graph-specs/02-module-review-agent/02-agent-task-graph.yaml`；
+  - `docs/02-module-review-agent/02-04-agent-workflow-history.md`，只追加新版本，不覆盖历史；
+  - Figma 当前 Agent 工作流图；
+  - `docs/07-delivery/07-04-optimization-implementation-status.md`；
+  - 对应契约与 Graph 测试。
+- 文档、Graph Spec 和 Figma 使用同一个 `workflow_version`。缺少任意同步项时，不得把
+  Agent 工作流变更标记为完成。
+- 实现中发现蓝图不适合项目时，先按蓝图中的 `Blueprint Change Proposal` 提交问题
+  证据、最小修改、复杂度、迁移与回退方案，由主对话审核；不得自行扩展为多 Agent
+  平台、分布式队列、通用插件市场或第二套 Agent Runtime。
+- `Blueprint Change Proposal` 只用于确实改变工作流拓扑、公共契约或基础设施的情况；
+  普通实现、重构、依赖安装、Bug 修复和测试调整按简单 TDD 直接推进，不设置额外门禁。
+
 ## 测试最低要求
 
+- 单元、模块、契约、Graph 节点、前端组件和日常 Playwright 必须使用 Fake、Fixture 或
+  Mock，不得因为本机已经配置模型而调用真实模型。
+- 真实模型只允许在核心功能完成、确定性全量回归通过后，由专用完整链路验收命令显式
+  开启；禁止把真实模型 Smoke 塞进单一模块测试或普通 `pytest` / Playwright 命令。
 - Domain/Application：纯 Python 单元测试。
 - Capability：输入输出 Schema、权限/开关、错误码测试。
 - REST：FastAPI TestClient。

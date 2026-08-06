@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-import secrets
+import base64
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -17,7 +22,10 @@ from ai_signal_api.schemas import (
     CardGenerateResult,
     CardPage,
     CardRead,
+    CardRenderResult,
+    CardUpdateInput,
 )
+from ai_signal_api.modules.agent_assets.artifacts import ArtifactService
 
 
 def _key_points(summary: str, topics: list[str]) -> list[str]:
@@ -86,8 +94,27 @@ class CardService:
                 title=title,
                 summary=summary,
                 key_points=_key_points(summary, item.topics),
-                cover_variant=secrets.randbelow(6),
+                cover_variant=int(
+                    hashlib.sha256(item.id.encode("utf-8")).hexdigest(),
+                    16,
+                )
+                % 6,
                 cover_url=self._source_cover_url(raw.source.config),
+                cover_source=(
+                    "original"
+                    if self._source_cover_url(raw.source.config)
+                    else "offline"
+                ),
+                template_id=(
+                    "offline-quote"
+                    if int(
+                        hashlib.sha256(item.id.encode("utf-8")).hexdigest(),
+                        16,
+                    )
+                    % 2
+                    == 0
+                    else "offline-grid"
+                ),
                 source_name=raw.source.name,
                 source_kind=raw.source.kind,
                 canonical_url=raw.canonical_url,
@@ -164,6 +191,77 @@ class CardService:
             raise LookupError("CARD_NOT_FOUND")
         return self._read(card)
 
+    def update(
+        self,
+        card_id: str,
+        payload: CardUpdateInput,
+    ) -> CardRead:
+        card = self.session.get(CardModel, card_id)
+        if card is None:
+            raise LookupError("CARD_NOT_FOUND")
+        if card.revision != payload.expected_revision:
+            raise ValueError("CARD_REVISION_CONFLICT")
+        card.title = payload.title
+        card.summary = payload.summary
+        card.key_points = payload.key_points
+        card.template_id = payload.template_id
+        card.cover_source = payload.cover_source
+        if payload.cover_source == "offline":
+            card.cover_url = None
+        card.revision += 1
+        card.render_status = "not_rendered"
+        card.rendered_artifact_id = None
+        card.rendered_revision = None
+        self.session.commit()
+        return self._read(card)
+
+    def render(
+        self,
+        card_id: str,
+        *,
+        artifact_root,
+        artifact_max_bytes: int,
+    ) -> CardRenderResult:
+        card = self.session.get(CardModel, card_id)
+        if card is None:
+            raise LookupError("CARD_NOT_FOUND")
+        if (
+            card.render_status == "rendered"
+            and card.rendered_artifact_id
+            and card.rendered_revision == card.revision
+        ):
+            return CardRenderResult(
+                card_id=card.id,
+                artifact_id=card.rendered_artifact_id,
+                status="rendered",
+            )
+        card.render_status = "rendering"
+        self.session.commit()
+        try:
+            png = _render_offline_png(card)
+            artifact = ArtifactService(
+                self.session,
+                artifact_root,
+                artifact_max_bytes,
+            ).create(
+                filename=f"{card.id}-r{card.revision}.png",
+                media_type="image/png",
+                content_base64=base64.b64encode(png).decode("ascii"),
+            )
+            card.render_status = "rendered"
+            card.rendered_artifact_id = artifact.id
+            card.rendered_revision = card.revision
+            self.session.commit()
+            return CardRenderResult(
+                card_id=card.id,
+                artifact_id=artifact.id,
+                status="rendered",
+            )
+        except Exception:
+            card.render_status = "failed"
+            self.session.commit()
+            raise
+
     def _utc_range(
         self,
         start_day: date,
@@ -199,4 +297,41 @@ class CardService:
             published_at=published_at,
             priority=card.priority,
             topics=card.topics,
+            revision=card.revision,
+            template_id=card.template_id,
+            cover_source=card.cover_source,
+            render_status=card.render_status,
+            rendered_artifact_id=card.rendered_artifact_id,
         )
+
+
+def _render_offline_png(card: CardModel) -> bytes:
+    project_root = Path(__file__).resolve().parents[6]
+    renderer = (
+        project_root / "vendor_tools/poster_renderer/render-poster.mjs"
+    )
+    node = shutil.which("node")
+    if node is None or not renderer.exists():
+        raise RuntimeError("POSTER_RENDERER_UNAVAILABLE")
+    payload = {
+        "variant": card.cover_variant,
+        "template_id": card.template_id,
+        "title": card.title,
+        "summary": card.summary,
+        "key_points": card.key_points,
+        "source_name": card.source_name,
+    }
+    result = subprocess.run(
+        [node, str(renderer)],
+        input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=30,
+    )
+    if result.returncode != 0 or not result.stdout.startswith(
+        b"\x89PNG\r\n\x1a\n"
+    ):
+        detail = result.stderr.decode("utf-8", errors="replace")[-500:]
+        raise RuntimeError(f"POSTER_RENDER_FAILED: {detail}")
+    return result.stdout

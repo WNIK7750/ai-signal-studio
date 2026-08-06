@@ -31,7 +31,7 @@
 
 - [Agent Pack Schema](../../contracts/02-agent-pack/agent-pack.schema.json)
 - [实时转写协议 Schema](../../contracts/03-realtime-transcription/realtime-transcription-protocol.schema.json)
-- [Agent Pack 示例](../../agent-packs/ai-editor/agent.yaml)
+- [Agent Pack 示例](../../agent-packs/examples/ai-editor/agent.yaml)
 - [实时转写实施提示词](../../prompts/03-module-agent-assets-stt/03-realtime-stt-coding-agent-prompt.md)
 - [WhisperLive 集成边界](../../vendor_tools/speech_to_text/whisperlive/INTEGRATION.md)
 
@@ -42,3 +42,15 @@
 - WebSocket 正确处理 partial、final、错误与 stop；
 - 组件卸载或结束时释放麦克风和连接；
 - 转写文字未经用户操作不会自动发送给 Agent。
+
+## 2026-08-06 实施证据
+
+- ZIP 导入、Diff、原子激活、版本编辑/回退、选择性导出和 SQLite FTS 已共用
+  `AgentPackService`；
+- Artifact 使用本地 Digest 去重、Magic Bytes 与大小边界；图片发送给 Agent 前先保存
+  Artifact，消息只记录 Artifact ID 和图片数量；
+- `RealtimeTranscriptionProvider`、Fake Provider、短时单会话 Token、WebSocket
+  partial/final/error/stop 与 MediaRecorder 资源释放已完成；
+- 普通测试和 Playwright 只使用 Fake 转写，不启动 WhisperLive 或真实模型；
+- Module 3 目标测试 `5 passed`，完整 Playwright 中 Agent Pack、Artifact 与转写流程
+  均通过。

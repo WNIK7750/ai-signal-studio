@@ -1,20 +1,35 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   IconAdjustments,
   IconCheck,
   IconChevronDown,
+  IconChevronRight,
+  IconArchive,
+  IconEye,
   IconExternalLink,
+  IconBookmarkPlus,
   IconRefresh,
   IconSearch,
+  IconStar,
   IconX,
 } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { StatusMark } from "@/components/status-mark";
 import { api, SourceKind, TimelineItem } from "@/lib/api";
 import { Priority } from "@/lib/priority";
+import {
+  localDateKey,
+  shouldCollapseTimelineDay,
+  timelineDayLabel,
+} from "./timeline-utils";
 
 const priorityOptions: { value: Priority | ""; label: string }[] = [
   { value: "", label: "全部" },
@@ -23,22 +38,30 @@ const priorityOptions: { value: Priority | ""; label: string }[] = [
   { value: "normal", label: "普通" },
 ];
 
-function dayLabel(value: string) {
-  const date = new Date(value);
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) return "今天";
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "昨天";
-  return `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
-}
-
 export function TimelineScreen() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<Priority | "">("");
   const [sourceKind, setSourceKind] = useState<SourceKind | "">("");
+  const [quickView, setQuickView] = useState<
+    "all" | "today" | "unread" | "starred"
+  >("all");
   const [asideOpen, setAsideOpen] = useState(true);
+  const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>(
+    () => {
+      if (typeof window === "undefined") return {};
+      try {
+        const stored = window.localStorage.getItem(
+          "ai-signal-timeline:collapsed:v1",
+        );
+        return stored ? JSON.parse(stored) : {};
+      } catch {
+        return {};
+      }
+    },
+  );
+  const [selectedItem, setSelectedItem] = useState<TimelineItem | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       if (window.matchMedia("(max-width: 820px)").matches) {
@@ -49,16 +72,41 @@ export function TimelineScreen() {
   }, []);
   const params = useMemo(() => {
     const value = new URLSearchParams();
+    value.set("archived", "false");
     if (search.trim()) value.set("search", search.trim());
     if (priority) value.set("priority", priority);
     if (sourceKind) value.set("source_kind", sourceKind);
+    if (quickView === "unread") value.set("seen", "false");
+    if (quickView === "starred") value.set("starred", "true");
+    if (quickView === "today") {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      value.set("published_from", start.toISOString());
+    }
     return value;
-  }, [priority, search, sourceKind]);
-  const timeline = useQuery({
+  }, [priority, quickView, search, sourceKind]);
+  const timeline = useInfiniteQuery({
     queryKey: ["timeline", params.toString()],
-    queryFn: () => api.timeline(params),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const pageParams = new URLSearchParams(params);
+      pageParams.set("limit", "30");
+      if (pageParam) pageParams.set("cursor", pageParam);
+      return api.timeline(pageParams);
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.has_more ? lastPage.next_cursor : undefined,
   });
+  const {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = timeline;
   const runs = useQuery({ queryKey: ["runs"], queryFn: api.runs });
+  const savedViews = useQuery({
+    queryKey: ["saved-views"],
+    queryFn: api.savedViews,
+  });
   const collect = useMutation({
     mutationFn: api.collect,
     onSuccess: () =>
@@ -67,17 +115,124 @@ export function TimelineScreen() {
         queryClient.invalidateQueries({ queryKey: ["runs"] }),
       ]),
   });
-  const timelineItems = timeline.data?.items;
+  const updateState = useMutation({
+    mutationFn: ({
+      itemId,
+      input,
+    }: {
+      itemId: string;
+      input: { seen?: boolean; starred?: boolean; archived?: boolean };
+    }) => api.updateInformationState(itemId, input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["timeline"] }),
+  });
+  const saveView = useMutation({
+    mutationFn: () =>
+      api.createSavedView({
+        name: `信息视图 ${new Date().toLocaleDateString("zh-CN")}`,
+        query: Object.fromEntries(params.entries()),
+        display: { mode: "timeline" },
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["saved-views"] }),
+  });
+  const timelineItems = useMemo(
+    () => timeline.data?.pages.flatMap((page) => page.items) ?? [],
+    [timeline.data?.pages],
+  );
   const grouped = useMemo(() => {
     const groups = new Map<string, TimelineItem[]>();
-    for (const item of timelineItems ?? []) {
-      const label = dayLabel(item.published_at);
-      groups.set(label, [...(groups.get(label) ?? []), item]);
+    for (const item of timelineItems) {
+      const key = localDateKey(item.published_at);
+      groups.set(key, [...(groups.get(key) ?? []), item]);
     }
     return [...groups.entries()];
   }, [timelineItems]);
+  const total = timeline.data?.pages[0]?.total ?? 0;
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    for (const key of [
+      "archived",
+      "search",
+      "priority",
+      "source_kind",
+      "seen",
+      "starred",
+      "published_from",
+    ]) {
+      url.searchParams.delete(key);
+    }
+    params.forEach((value, key) => url.searchParams.set(key, value));
+    window.history.replaceState(null, "", url);
+  }, [params]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "240px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  ]);
+
+  useEffect(() => {
+    const focusId = new URLSearchParams(window.location.search).get("focus");
+    if (!focusId) return;
+    const focused = timelineItems.find((item) => item.id === focusId);
+    if (!focused) {
+      if (hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
+      }
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      setSelectedItem(focused);
+      const key = localDateKey(focused.published_at);
+      setCollapsedDays((current) => ({ ...current, [key]: false }));
+      document
+        .querySelector(`[data-information-id="${CSS.escape(focusId)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    timelineItems,
+  ]);
+
+  function toggleDay(key: string) {
+    setCollapsedDays((current) => {
+      const next = {
+        ...current,
+        [key]:
+          current[key] === undefined
+            ? !shouldCollapseTimelineDay(key)
+            : !current[key],
+      };
+      window.localStorage.setItem(
+        "ai-signal-timeline:collapsed:v1",
+        JSON.stringify(next),
+      );
+      return next;
+    });
+  }
   const latestRun = runs.data?.[0];
-  const activeFilterCount = Number(Boolean(priority)) + Number(Boolean(sourceKind));
+  const activeFilterCount =
+    Number(Boolean(priority)) +
+    Number(Boolean(sourceKind)) +
+    Number(quickView !== "all");
 
   const filterAside = (
     <>
@@ -183,14 +338,81 @@ export function TimelineScreen() {
       </header>
 
       <section className="content-frame">
+        <div className="information-viewbar">
+          <div className="quick-views" aria-label="快捷视图">
+            {(
+              [
+                ["all", "全部"],
+                ["today", "今天"],
+                ["unread", "未读"],
+                ["starred", "已收藏"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className={quickView === value ? "active" : ""}
+                onClick={() => setQuickView(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="saved-view-strip">
+            {savedViews.data?.slice(0, 3).map((view) => (
+              <button
+                key={view.id}
+                onClick={() => {
+                  const query = view.query;
+                  setSearch(typeof query.search === "string" ? query.search : "");
+                  setPriority(
+                    typeof query.priority === "string"
+                      ? (query.priority as Priority)
+                      : "",
+                  );
+                  setSourceKind(
+                    typeof query.source_kind === "string"
+                      ? (query.source_kind as SourceKind)
+                      : "",
+                  );
+                  setQuickView(
+                    query.starred === "true"
+                      ? "starred"
+                      : query.seen === "false"
+                        ? "unread"
+                        : "all",
+                  );
+                }}
+              >
+                {view.name}
+              </button>
+            ))}
+            <button
+              className="save-view-button"
+              onClick={() => saveView.mutate()}
+              disabled={saveView.isPending}
+            >
+              <IconBookmarkPlus size={15} />
+              保存当前视图
+            </button>
+          </div>
+        </div>
+
         <div className="run-summary">
           <span className="success-icon">
             <IconCheck size={15} />
           </span>
-          <strong>{latestRun ? "采集已完成" : "准备就绪"}</strong>
+          <strong>
+            {latestRun
+              ? latestRun.execution_status === "failed"
+                ? "上次采集失败"
+                : latestRun.coverage_status === "met"
+                  ? "采集完成 · 覆盖达标"
+                  : "采集完成 · 覆盖未达标"
+              : "准备就绪"}
+          </strong>
           <span>
             {latestRun
-              ? `新增 ${latestRun.items_added} 条 · 共 ${timeline.data?.total ?? 0} 条`
+              ? `新增 ${latestRun.items_added} 条 · 共 ${total} 条`
               : "点击立即采集获取最新内容"}
           </span>
           <time>
@@ -219,11 +441,42 @@ export function TimelineScreen() {
         )}
 
         <div className="timeline">
-          {grouped.map(([label, items]) => (
-            <section key={label} className="timeline-day">
-              <h2>{label}</h2>
-              {items.map((item) => (
-                <article key={item.id} className="timeline-item">
+          {grouped.map(([dayKey, items]) => {
+            const isCollapsed =
+              collapsedDays[dayKey] ??
+              shouldCollapseTimelineDay(dayKey);
+            const unreadCount = items.filter((item) => !item.seen).length;
+            const importantCount = items.filter(
+              (item) => item.priority === "important",
+            ).length;
+            return (
+            <section key={dayKey} className="timeline-day">
+              <h2>
+                <button
+                  className="timeline-day-toggle"
+                  onClick={() => toggleDay(dayKey)}
+                  aria-expanded={!isCollapsed}
+                >
+                  {isCollapsed ? (
+                    <IconChevronRight size={17} />
+                  ) : (
+                    <IconChevronDown size={17} />
+                  )}
+                  <span>{timelineDayLabel(dayKey)}</span>
+                  <small>
+                    {items.length} 条 · {unreadCount} 未读
+                    {importantCount > 0 ? ` · ${importantCount} 重要` : ""}
+                  </small>
+                </button>
+              </h2>
+              {!isCollapsed && items.map((item) => (
+                <article
+                  key={item.id}
+                  className={`timeline-item ${
+                    selectedItem?.id === item.id ? "is-focused" : ""
+                  }`}
+                  data-information-id={item.id}
+                >
                   <div className="timeline-rail">
                     <StatusMark priority={item.priority} compact />
                   </div>
@@ -238,7 +491,22 @@ export function TimelineScreen() {
                       <span>{item.source_name}</span>
                       <StatusMark priority={item.priority} />
                     </div>
-                    <h3>{item.title}</h3>
+                    <h3>
+                      <button
+                        className="timeline-title-button"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          if (!item.seen) {
+                            updateState.mutate({
+                              itemId: item.id,
+                              input: { seen: true },
+                            });
+                          }
+                        }}
+                      >
+                        {item.title}
+                      </button>
+                    </h3>
                     <p>{item.summary}</p>
                     <div className="tag-row">
                       {item.topics.slice(0, 3).map((topic) => (
@@ -246,20 +514,109 @@ export function TimelineScreen() {
                       ))}
                     </div>
                   </div>
-                  <a
-                    className="item-open"
-                    href={item.canonical_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`打开 ${item.title}`}
-                  >
-                    <IconExternalLink size={18} />
-                  </a>
+                  <div className="item-actions">
+                    <button
+                      className={item.seen ? "active" : ""}
+                      onClick={() =>
+                        updateState.mutate({
+                          itemId: item.id,
+                          input: { seen: !item.seen },
+                        })
+                      }
+                      aria-label={item.seen ? "标记为未读" : "标记为已读"}
+                      title={item.seen ? "标记为未读" : "标记为已读"}
+                    >
+                      <IconEye size={17} />
+                    </button>
+                    <button
+                      className={item.starred ? "active starred" : ""}
+                      onClick={() =>
+                        updateState.mutate({
+                          itemId: item.id,
+                          input: { starred: !item.starred },
+                        })
+                      }
+                      aria-label={item.starred ? "取消收藏" : "收藏"}
+                      title={item.starred ? "取消收藏" : "收藏"}
+                    >
+                      <IconStar size={17} />
+                    </button>
+                    <button
+                      onClick={() =>
+                        updateState.mutate({
+                          itemId: item.id,
+                          input: { archived: true },
+                        })
+                      }
+                      aria-label="归档"
+                      title="归档"
+                    >
+                      <IconArchive size={17} />
+                    </button>
+                    <a
+                      href={item.canonical_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() =>
+                        updateState.mutate({
+                          itemId: item.id,
+                          input: { seen: true },
+                        })
+                      }
+                      aria-label={`打开 ${item.title}`}
+                      title="打开原文"
+                    >
+                      <IconExternalLink size={17} />
+                    </a>
+                  </div>
                 </article>
               ))}
             </section>
-          ))}
+          )})}
+          <div ref={loadMoreRef} className="timeline-load-more">
+            {hasNextPage && (
+              <button
+                className="secondary-button"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? "正在加载…" : "加载更多"}
+              </button>
+            )}
+          </div>
         </div>
+        {selectedItem && (
+          <aside className="information-detail-panel" aria-label="信息详情">
+            <div className="information-detail-title">
+              <div>
+                <span className="eyebrow">{selectedItem.source_name}</span>
+                <h2>{selectedItem.title}</h2>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setSelectedItem(null)}
+                aria-label="关闭信息详情"
+              >
+                <IconX size={18} />
+              </button>
+            </div>
+            <p>{selectedItem.summary}</p>
+            <div className="tag-row">
+              {selectedItem.topics.map((topic) => (
+                <span key={topic}>{topic}</span>
+              ))}
+            </div>
+            <a
+              className="primary-button"
+              href={selectedItem.canonical_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <IconExternalLink size={17} />
+              打开原文
+            </a>
+          </aside>
+        )}
       </section>
     </AppShell>
   );

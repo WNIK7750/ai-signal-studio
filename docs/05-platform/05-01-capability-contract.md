@@ -140,3 +140,13 @@ Tool 中禁止写业务逻辑。
 3. 开关禁用测试；
 4. 需要审批测试；
 5. 副作用幂等测试（如适用）。
+
+## 10. 2026-08-06 产品能力面
+
+当前 LangChain Tool 由 `TOOL_SCHEMAS` 通用绑定，统一覆盖信息、来源、任务、运行、
+审核、卡片、Agent Pack、Artifact、模型、会话和外观。每个 Tool 仍只映射一个
+Capability；来源/任务/卡片等 REST 路径调用同一 Application Service。
+
+每步最多装配 3 个 Domain 与 8 个 Tool。禁用项在装配时不可见，即使模型或客户端伪造
+Capability ID，`CapabilityExecutor` 仍返回 `CAPABILITY_DISABLED`。模型列表只返回
+`has_api_key`，外观变化只返回 `ClientActionResult`，不允许后端操作 DOM。

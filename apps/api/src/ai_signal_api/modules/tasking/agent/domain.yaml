@@ -1,0 +1,12 @@
+id: tasking
+version: 1.0.0
+title: 任务
+description: 查询、修改和运行版本化采集任务
+capabilities:
+  - task.list
+  - task.get
+  - task.update
+  - task.run.start
+result_blocks:
+  - navigation_action
+  - partial_failure
