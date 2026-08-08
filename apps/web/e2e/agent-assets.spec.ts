@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import path from "node:path";
 
 test("previews an Agent Pack and uploads a local Artifact", async ({ page }) => {
   await page.route("**/api/agent-packs/import-preview", async (route) => {
@@ -36,6 +37,18 @@ test("previews an Agent Pack and uploads a local Artifact", async ({ page }) => 
   await expect(
     page.getByRole("heading", { name: "Agent 资产" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Skills 3/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Skills 3/ }).click();
+  await expect(page.getByLabel("Skill 名称").first()).toBeVisible();
+  await page.getByLabel("Skill 说明").first().fill("E2E 可编辑说明");
+  await page.getByRole("button", { name: "保存 Rules / Skills" }).click();
+  await expect(page.getByLabel("Skill 说明").first()).toHaveValue(
+    "E2E 可编辑说明",
+  );
+  await page.getByRole("button", { name: "Rules" }).click();
+  await expect(page.getByLabel("工作区规则")).toBeVisible();
   await page.locator('input[accept*=".zip"]').setInputFiles({
     name: "ai-editor.zip",
     mimeType: "application/zip",
@@ -52,6 +65,15 @@ test("previews an Agent Pack and uploads a local Artifact", async ({ page }) => 
       buffer: Buffer.from("# Evidence\nOfficial source only."),
     });
   await expect(page.getByText("evidence.md")).toBeVisible();
+  await expect(page.getByRole("button", { name: /文档 1/ })).toBeVisible();
+  await expect(page.getByText("本地上传")).toBeVisible();
+  await page.screenshot({
+    path: path.join(
+      process.env.TEMP ?? ".",
+      "ai-signal-agent-assets-1440.png",
+    ),
+    fullPage: true,
+  });
   await expect(page.locator(".artifact-list code").first()).toContainText(
     "artifact_",
   );

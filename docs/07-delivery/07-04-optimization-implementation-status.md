@@ -1058,3 +1058,40 @@ Figma 阻塞：连接器拒绝向指定 FigJam 写入内部工作流架构，提
 - Figma Release Sync Section `12:364` 明确记录
   `0.7.0/1.2.0/1.2.0/1.2.0/1.3.0`、Context Engineering 边界和上述验收证据；
   节点回读与 2048px 截图核验均通过，无裁切、无重叠，图谱同步门禁已关闭。
+## 17. 2026-08-07 Workspace Agent 0.8.0 个性化上下文与搜索模型
+
+状态：**实现、契约、文档、Figma、完整确定性全栈与真实 qwen3.7-plus 验收全部通过。**
+
+- 模型设置新增唯一“搜索模型”角色，使用 OpenAI 兼容 Responses `web_search`；
+  支持 OpenAI 与百炼，共用现有抓取、缓存、正常化与统一检索链，Brave 保留为备用；
+- Provider 复用选择器列出全部关联模型名称，避免同名 Provider 无法区分；
+- Agent Pack 新增可编辑、可版本化 Rules / Skills；默认提供证据优先、清晰中文和
+  安全操作三项 Skill；
+- Rules 始终有界加载；Skill 仅按当前步骤 Domain 动态选择，禁用项不进入 Context，
+  每轮 Manifest 记录 Agent Pack 版本；
+- 运行记录按信息处理、Agent、内容产物和其他粗粒度切换；分类由能力前缀派生，
+  新能力仍会进入“其他”，不会被固定枚举隐藏；
+- Artifact 按生成内容、图片、文档切换，并展示来源标题、来源时间和可用跳转链接；
+- `workflow/state/plan/event/context` 版本为
+  `0.8.0/1.2.0/1.2.0/1.2.0/1.4.0`；N01～N25 拓扑未改变。
+- Figma 已在既定 FigJam 追加 0.8.0 Release Sync Section `15:364`，业务节点
+  `16:366`～`16:399`、连接器 `17:388`～`17:436`；1800px 截图核验无裁切、无重叠，
+  0.7.0 历史 Section `12:364` 保持不变。
+- 验收：后端 `162 passed, 1 deselected`；契约 `3 passed`；前端 `13 passed`，
+  ESLint 与生产构建通过；Playwright `13/13`；专用真实模型命令使用
+  `qwen3.7-plus` 完成 `1 passed`，耗时 148.76 秒。
+
+## 18. 2026-08-08 Workspace Agent 0.8.0 Agent Pack 启动兼容热修复
+
+状态：**实现、确定性全量、浏览器回归与真实模型单次验收全部通过。**
+
+- 根因是旧系统默认 Pack 仍处于 Active，且缺失 `agent.yaml` 时运行时直接抛出未处理
+  `KeyError`；不是模型连接或 qwen3.7-plus 推理失败；
+- 系统默认 Pack 现在随仓库默认版本安全升级；用户 Pack 保持优先，不会被启动流程覆盖；
+- 相同版本的损坏/缺失存储会迁移到新的内容寻址目录后修复数据库引用；
+- 运行时读取不到自定义 Pack 时使用有界内置规则继续执行，并记录可追溯降级事件；
+- E2E 的 Agent Pack 与 Artifact 存储已隔离到临时目录；
+- 验收：后端 `165 passed, 1 deselected`；契约 `3 passed`；前端 `13 passed`，ESLint、
+  生产构建和 Playwright 通过；真实 qwen3.7-plus Turn
+  `turn_f9464089162e4b64801d9afc0b6427a1` 为 `complete`，工作流仍为 `0.8.0`，
+  Agent Pack 为 `0.2.0`。

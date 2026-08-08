@@ -150,7 +150,7 @@ class AgentTurnModel(Base):
     )
     message: Mapped[str] = mapped_column(Text)
     workflow_version: Mapped[str] = mapped_column(
-        String(24), default="0.7.0"
+        String(24), default="0.8.0"
     )
     manifest: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     plan: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

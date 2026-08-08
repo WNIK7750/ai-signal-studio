@@ -82,7 +82,25 @@ class ArtifactRead(BaseModel):
     status: str
     extracted_text: str
     metadata: dict
+    source_title: str
+    source_url: str | None
+    source_time: datetime
     created_at: datetime
+
+
+class AgentSkillWrite(BaseModel):
+    id: str = Field(pattern=r"^[a-z][a-z0-9-]{1,63}$")
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=500)
+    enabled: bool = True
+    domains: list[str] = Field(default_factory=lambda: ["*"], max_length=12)
+    instructions: str = Field(min_length=1, max_length=8000)
+
+
+class AgentCustomizationWrite(BaseModel):
+    version: str = Field(pattern=r"^[0-9]+\.[0-9]+\.[0-9]+$")
+    rules: str = Field(min_length=1, max_length=16000)
+    skills: list[AgentSkillWrite] = Field(min_length=1, max_length=20)
 
 
 class TranscriptionStart(BaseModel):
@@ -121,6 +139,13 @@ def _pack_read(model: AgentPackVersionModel) -> AgentPackRead:
 
 
 def _artifact_read(model: ArtifactModel) -> ArtifactRead:
+    metadata = model.metadata_json
+    source_time = model.created_at
+    if isinstance(metadata.get("source_time"), str):
+        try:
+            source_time = datetime.fromisoformat(metadata["source_time"])
+        except ValueError:
+            pass
     return ArtifactRead(
         artifact_id=model.id,
         media_type=model.media_type,
@@ -130,7 +155,14 @@ def _artifact_read(model: ArtifactModel) -> ArtifactRead:
         size_bytes=model.size_bytes,
         status=model.status,
         extracted_text=model.extracted_text,
-        metadata=model.metadata_json,
+        metadata=metadata,
+        source_title=str(metadata.get("source_title") or "本地生成"),
+        source_url=(
+            str(metadata["source_url"])
+            if metadata.get("source_url")
+            else None
+        ),
+        source_time=source_time,
         created_at=model.created_at,
     )
 
@@ -270,6 +302,53 @@ def edit_agent_pack(
             pack_id,
             path=payload.path,
             content=payload.content,
+            version=payload.version,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except AgentPackError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return _pack_read(model)
+
+
+@router.get("/api/agent-packs/{pack_id}/customization")
+def get_agent_pack_customization(
+    pack_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    try:
+        return AgentPackService(
+            session,
+            request.app.state.settings.agent_pack_root,
+        ).get_customization(pack_id)
+    except AgentPackError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.put(
+    "/api/agent-packs/{pack_id}/customization",
+    response_model=AgentPackRead,
+)
+def save_agent_pack_customization(
+    pack_id: str,
+    payload: AgentCustomizationWrite,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> AgentPackRead:
+    try:
+        model = AgentPackService(
+            session,
+            request.app.state.settings.agent_pack_root,
+        ).save_customization(
+            pack_id,
+            rules=payload.rules,
+            skills=[
+                skill.model_dump()
+                for skill in payload.skills
+            ],
             version=payload.version,
         )
     except LookupError as error:

@@ -11,7 +11,8 @@
     "supports_vision": false,
     "output_token_limit": null,
     "enabled": true,
-    "is_default": true
+    "is_default": true,
+    "is_search_model": false
   },
   {
     "id": "model_vision",
@@ -25,6 +26,7 @@
     "supports_vision": true,
     "output_token_limit": 16000,
     "enabled": true,
-    "is_default": false
+    "is_default": false,
+    "is_search_model": true
   }
 ]

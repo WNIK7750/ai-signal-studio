@@ -98,6 +98,20 @@ export interface AgentPackPreview {
   removed: string[];
   changed: string[];
 }
+export interface AgentSkill {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  domains: string[];
+  instructions: string;
+}
+export interface AgentPackCustomization {
+  pack_id: string;
+  version: string;
+  rules: string;
+  skills: AgentSkill[];
+}
 export interface Artifact {
   artifact_id: string;
   media_type: string;
@@ -108,6 +122,9 @@ export interface Artifact {
   status: string;
   extracted_text: string;
   metadata: Record<string, unknown>;
+  source_title: string;
+  source_url: string | null;
+  source_time: string;
   created_at: string;
 }
 export interface CollectionRun {
@@ -306,6 +323,7 @@ export interface ModelConfig {
   output_token_limit: number | null;
   enabled: boolean;
   is_default: boolean;
+  is_search_model: boolean;
   connection_status:
     | "pending"
     | "healthy"
@@ -322,6 +340,7 @@ export interface ProviderConfig {
   base_url: string;
   protocol: "heuristic" | "openai_compatible";
   has_api_key: boolean;
+  model_names: string[];
 }
 export interface ModelWriteInput {
   name: string;
@@ -648,6 +667,23 @@ export const api = {
       { method: "POST" },
     );
   },
+  agentPackCustomization(packId: string) {
+    return request<AgentPackCustomization>(
+      `/agent-packs/${packId}/customization`,
+    );
+  },
+  saveAgentPackCustomization(
+    packId: string,
+    input: Pick<AgentPackCustomization, "version" | "rules" | "skills">,
+  ) {
+    return request<AgentPackVersion>(
+      `/agent-packs/${packId}/customization`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input),
+      },
+    );
+  },
   artifacts: () => request<Artifact[]>("/artifacts"),
   createArtifact(input: {
     filename: string;
@@ -773,6 +809,11 @@ export const api = {
   },
   activateModel(modelId: string) {
     return request<ModelConfig>(`/models/${modelId}/activate`, {
+      method: "POST",
+    });
+  },
+  activateSearchModel(modelId: string) {
+    return request<ModelConfig>(`/models/${modelId}/activate-search`, {
       method: "POST",
     });
   },

@@ -1,143 +1,270 @@
 # AI Signal Studio
 
-AI Signal Studio 是一个本地部署、可自行配置的模块化 AI 信息工作台。系统能够定时或按需收集 AI 相关信息，生成按日期组织的信息流；内置 Workspace Agent 与界面共用相同能力，并可直接维护常用方案和定时任务。
+> 本地优先、可配置、可恢复的 AI 信息与知识工作台。
 
-当前仓库已经具备可运行的桌面闭环：Next.js 前端、FastAPI 模块化后端、
-SQLite 本地数据、版本化采集任务、真实试运行、定时调度、采集与去重、
-统一 AI 信息库、已读/收藏/归档、保存视图、批量审核、封面卡片浏览、
-可持久化对话 Agent、结构化任务草稿、来源健康、双状态运行记录、
-工作区模型切换、主题定制、Agent Pack、Artifact、实时语音转写，以及经过双重审批的
-PNG 海报编辑与导出。外部 Agent Gateway 仍是延后设计项，不随本地产品发布启用。
+AI Signal Studio 持续收集 RSS、GitHub Releases 与联网搜索中的最新信息，完成标准化、
+去重、检索、分析、审核和内容生成，并将结果沉淀为可追溯的本地信息资产。内置
+Workspace Agent 不是独立的聊天壳：它与界面共用同一套业务能力，可以规划并执行采集、
+研究、审核和内容加工任务。
 
-## 开始阅读
+当前版本面向 **Windows 单工作区本地部署**，默认可离线启动；配置支持 Tool Calling
+的模型后，即可启用完整的自然语言 Agent 工作流。
 
-1. [AGENTS.md](AGENTS.md)：项目内 Agent 和开发者必须遵守的工作约束。
-2. [docs/README.md](docs/README.md)：按模块编号的完整文档导航。
-3. [docs/00-project/00-01-project-charter.md](docs/00-project/00-01-project-charter.md)：产品目标、成功标准与非目标。
-4. [docs/07-delivery/07-01-development-roadmap.md](docs/07-delivery/07-01-development-roadmap.md)：四个模块的实施顺序。
-5. [docs/07-delivery/07-04-optimization-implementation-status.md](docs/07-delivery/07-04-optimization-implementation-status.md)：最新蓝图的已实现范围、新增任务和下一批边界。
-6. [docs/05-platform/05-04-responsive-layout.md](docs/05-platform/05-04-responsive-layout.md)：桌面优先的动态布局约束。
+> [!NOTE]
+> 项目处于 `0.1.0` 开发阶段。桌面核心闭环已经可运行；外部 A2A/MCP Agent Gateway、
+> 通用工作流编辑器和移动端专项设计仍未交付。完整状态见
+> [实现与验收记录](docs/07-delivery/07-04-optimization-implementation-status.md)。
 
-准备实现某个模块时，直接进入对应编号目录：
+<p align="center">
+  <a href="docs/05-platform/assets/readme/app-timeline.png">
+    <img src="docs/05-platform/assets/readme/app-timeline.png" alt="AI Signal Studio AI 信息时间线与筛选界面" width="100%" />
+  </a>
+</p>
 
-| 模块 | 目标 | 文档入口 |
-| --- | --- | --- |
-| 01 | AI 信息与采集 | [01-module-timeline](docs/01-module-timeline/01-00-overview.md) |
-| 02 | 审核工作台与 Workspace Agent | [02-module-review-agent](docs/02-module-review-agent/02-00-overview.md) |
-| 03 | Agent Pack、Artifact 与实时转写 | [03-module-agent-assets-stt](docs/03-module-agent-assets-stt/03-00-overview.md) |
-| 04 | 信息卡片与后续外部接口 | [04-module-poster-interop](docs/04-module-poster-interop/04-00-overview.md) |
+<p align="center"><sub>真实运行界面：统一 AI 信息时间线、采集状态与组合筛选</sub></p>
 
-## 最高级开发原则
+## 为什么做这个项目
 
-1. **先做成品，再根据真实问题收紧边界。** 按模块交付可使用的前后端闭环，不先建设大型平台底座。
-2. **简单 TDD。** 每个模块先写少量关键失败测试，再做最小实现，通过后小步重构。
-3. **统一能力入口。** 用户端、内置 Agent、LangGraph、REST、MCP、A2A 和测试脚本调用同一套 Application Capability。
-4. **模块化单体优先。** 前后端分离；后端内部低耦合，但在出现明确运行压力前不拆微服务。
-5. **Agent 可使用应用全部功能。** 能力开关、权限、额度与人工确认决定某个 Agent 在某次执行中能否调用，而不是为 Agent 另写一套功能。
-6. **文档驱动客制化。** Agent 身份、提示词、偏好、知识和长期记忆保存在可导入、可编辑、可版本控制的 Agent Pack 文档中。
-7. **第三方工具隔离。** 引入的现成工具统一放在 `vendor_tools/`；业务代码只依赖我们定义的适配接口。
-8. **语音仅做实时语音转文字。** 浏览器实时采集麦克风，通过 WebSocket 转写为可编辑文本；不以“上传音频文件”为主要产品路径。
-9. **不建设登录系统。** 软件按单工作区本地部署，设置和主题保存在部署实例或当前浏览器，不引入账号、个人版或登录入口。
+传统的信息工具负责“展示内容”，通用 Agent 负责“回答问题”，两者之间通常缺少稳定的
+执行、证据和知识沉淀链路。AI Signal Studio 将这些环节放进一个可恢复的本地工作区：
 
-## 仓库结构
+| 传统实现 | AI Signal Studio 的做法 |
+| --- | --- |
+| 搜索、收藏、分析和写作散落在不同工具 | 统一为“采集 → 信息库 → 研究 → 审核 → 内容产物”闭环 |
+| 前端、Agent 和 API 分别实现业务规则 | 通过 Capability Core 共用同一套 Application Service |
+| 用关键词分支模拟 Agent，一次只能处理单一动作 | 使用真实 LangChain Agent + LangGraph `StateGraph` 执行多步骤计划 |
+| 长任务刷新后丢失，单步失败导致整体失败 | 持久化 Turn、Event 与 Checkpoint，支持续传、恢复、取消和局部完成 |
+| 将全部历史和知识直接塞入 Prompt | 按任务动态选择 Domain、Rules、Skills、工具和历史证据 |
+| 模型生成的结论缺少可验证引用 | 研究结果绑定真实 `information_id`、来源和站内路径 |
+| 每次查询都调用外部搜索 | 本地检索满足目标时零网络调用，证据不足时才联网补充 |
 
-```text
-.
-├── AGENTS.md                     # 开发与 Agent 工作约束
-├── apps/web/                     # Next.js 产品界面
-├── apps/api/                     # FastAPI 模块化后端
-├── docs/                         # 按 00～07、90、99 编号的设计文档
-├── contracts/                    # 按能力域分类的机器可读契约
-├── graph-specs/                  # 与模块号对齐的 LangGraph 规格
-├── prompts/                      # 与模块号对齐的实施提示词
-├── agent-packs/                  # 文档化 Agent Pack 示例
-├── vendor_tools/                 # 第三方工具隔离区
-└── tests/                        # 后端、能力和契约测试
+## 能做什么
+
+```mermaid
+flowchart LR
+    A["来源与采集任务"] --> B["标准化与去重"]
+    B --> C["统一信息库"]
+    C --> D["检索与 Agent 研究"]
+    D --> E["人工审核"]
+    E --> F["卡片、Artifact 与 PNG"]
+    D --> G["任务、证据与运行记录"]
 ```
 
-## 使用方式
+### 收集最新信息
 
-- 新对话中的编程 Agent：先阅读 `AGENTS.md`，再读取当前模块的 `XX-00-overview.md`。
-- 实现前：运行现有测试，新增当前模块最关键的失败测试。
-- 实现后：运行模块测试、契约测试和一个端到端冒烟测试。
-- 修改 Schema：同步更新 `contracts/`、示例、测试和变更记录。
+- 配置 RSS/Atom、GitHub Releases 和搜索来源；
+- 手动采集、试运行或按计划定时执行；
+- 通过 canonical URL、稳定 ID 和内容特征去重；
+- 记录任务版本、来源版本、筛选漏斗、执行状态与覆盖状态。
 
-## Windows 11 安装与一键启动
+<p align="center">
+  <a href="docs/05-platform/assets/readme/app-task-workbench.png">
+    <img src="docs/05-platform/assets/readme/app-task-workbench.png" alt="AI Signal Studio 采集任务配置与试运行结果" width="100%" />
+  </a>
+</p>
+
+<p align="center"><sub>版本化采集任务：在正式执行前验证来源、匹配规则与筛选漏斗</sub></p>
+
+### 把信息变成可检索资产
+
+- 按日期浏览统一信息时间线；
+- 搜索、筛选、已读、收藏、归档、笔记和保存视图；
+- 使用 SQLite FTS5 BM25、短词匹配、RRF 融合和 SimHash 近重复分组；
+- 统一检索待处理、信息库、归档和卡片阶段，避免同一内容被重复加工。
+
+### 让 Agent 完成真实工作
+
+- 将自然语言目标转换为结构化 Goal 与 Plan；
+- 按步骤动态加载 Domain Prompt、Agent Pack、Skill 和 Capability Tool；
+- 支持并行步骤、人工审批、失败继续、最多两次有界 Replan；
+- 通过 SSE 输出计划、进度、证据、部分失败和结构化结果；
+- 对候选不足或证据缺失返回明确的 `partial`，不虚构来源和结论。
+
+<p align="center">
+  <a href="docs/05-platform/assets/readme/app-agent-plan.png">
+    <img src="docs/05-platform/assets/readme/app-agent-plan.png" alt="Workspace Agent 执行研究计划并展示步骤状态" width="49%" />
+  </a>
+  <a href="docs/05-platform/assets/readme/app-agent-result.png">
+    <img src="docs/05-platform/assets/readme/app-agent-result.png" alt="Workspace Agent 完成研究并返回可追溯结果" width="49%" />
+  </a>
+</p>
+
+<p align="center"><sub>左：可展开的执行计划与步骤状态 —— 右：绑定站内证据的推荐和趋势总结</sub></p>
+
+### 定义自己的 Agent 工作方式
+
+Agent Pack 使用 Markdown、YAML 和 JSONL 保存可编辑、可版本化的：
+
+- 身份与行为；
+- Workspace Rules；
+- 可启用 Skills；
+- 能力、来源与评分策略；
+- 知识、偏好、事实、决策和观察记忆；
+- 卡片样式与输出示例。
+
+Agent Pack 文件是事实来源，数据库只保存版本、引用和索引状态。运行时按需加载相关内容，
+不会无条件把整个知识目录发送给模型。
+
+<p align="center">
+  <a href="docs/05-platform/assets/readme/app-agent-assets.png">
+    <img src="docs/05-platform/assets/readme/app-agent-assets.png" alt="AI Signal Studio Agent Pack 与 Skills 配置界面" width="100%" />
+  </a>
+</p>
+
+<p align="center"><sub>Agent Pack 资产：用可版本化文件定义身份、规则、Skills、知识与长期记忆</sub></p>
+
+### 审核并生成内容产物
+
+- 批量保留、拒绝、延后或编辑信息；
+- 从已确认信息生成可编辑卡片；
+- 经过审批后使用 HTML/CSS + Playwright 离线渲染 1200×1500 PNG；
+- 管理文档、图片和生成内容 Artifact；
+- 使用浏览器麦克风和 WebSocket 将实时语音转成可编辑文字。
+
+## 快速开始
+
+### 环境要求
+
+- Windows 11；
+- Python `3.12`；
+- Node.js `>=20.19 <25`；
+- Git。
+
+项目锁定 pnpm `11.9.x`，初始化脚本会优先复用可用版本，或通过 Corepack/npx 准备
+项目内工具。
+
+### 安装并启动
 
 ```powershell
-# 首次安装：双击 setup.cmd，或在终端运行
+git clone https://github.com/WNIK7750/ai-signal-studio.git
+cd ai-signal-studio
+
+# 首次安装；也可以直接双击 setup.cmd
 .\scripts\bootstrap.ps1
 
-# 一键启动：双击 start.cmd；终端中也可运行
+# 启动 API 与 Web；也可以直接双击 start.cmd
 .\start.ps1
 ```
 
-初始化脚本不依赖全局安装的 pnpm：它会优先使用正确版本的 pnpm，
-否则通过 Corepack（或 npx 后备）在项目 `.tools/` 中准备锁定版本。
-`start.cmd` 和直接运行 `start.ps1` 都会在启动失败时保留诊断，并以
-`报错编号（中文提示）` 显示原因；自动化调用可给 `start.ps1` 传入
-`--no-pause`。启动成功后窗口会自动保持打开并持续监测服务，直到用户按 `Ctrl+C`
-或关闭窗口；应用已经健康运行时，再次双击会复用现有服务、打开页面并同样保持窗口。
+应用准备完成后会打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。按 `Ctrl+C`
+可以同时停止前后端。
 
-项目版本以根目录 `VERSION` 为统一基线，Python 版本记录在
-`.python-version`，Node 版本记录在 `.node-version`。Python 依赖锁定在
-`requirements.lock`，Web 依赖锁定在 `pnpm-lock.yaml`。完成修改后可运行：
+首次启动会：
 
-```powershell
-# 后端、契约、前端测试、检查与生产构建
-.\scripts\verify.ps1
+1. 创建本地 SQLite 数据库；
+2. 准备 OpenAI 官方 RSS、LangGraph Releases 和 Transformers Releases 三个真实来源；
+3. 使用无需 API Key 的离线 `heuristic` Provider；
+4. 将对话、任务、信息、Checkpoint 和 Artifact 保存在本机。
 
-# 额外运行桌面端端到端流程
-.\scripts\verify.ps1 -E2E
+即使没有配置模型，来源、采集、时间线、筛选、任务、审核、卡片和确定性研究仍然可用。
 
-# 清理可重建缓存、测试产物和旧 Playwright 数据
-.\scripts\clean.ps1
+### 配置模型
+
+1. 启动应用并打开 `/settings/models`；
+2. 选择 Provider 预设；
+3. 填写 API Key、模型 ID 和模型能力；
+4. 保存后执行连接测试；
+5. 在 Workspace Agent 会话中选择模型。
+
+模型元数据保存在 `config/models.local.json`，密钥保存在
+`config/model-secrets.local.json`。两个文件均被 Git 忽略，API 不返回密钥原文。
+
+联网补证可使用模型原生 `web_search`；未配置搜索模型时，可以在根目录 `.env` 中设置
+`AI_SIGNAL_SEARCH_API_KEY`，使用 Brave Search Adapter 作为后备。
+
+### 尝试一个完整任务
+
+在 Workspace Agent 中输入：
+
+```text
+收集最近 24 小时的热点 AI 内容，选出影响力最大的 3 条，给出分析总结并保留引用。
 ```
 
-脚本固定使用项目 `.venv` 启动 API。一键启动默认不启用 Uvicorn reload，避免 Windows
-关闭窗口后遗留持有 8000 端口的重载子进程；需要交互式后端热重载时可显式传入
-`--reload`，生产模式会忽略该参数。
-如果检测到当前项目留下的半启动 Uvicorn/Next 进程，脚本会核对进程命令行后安全重启；
-若已通过专属健康检查但受权限边界限制无法重启，则复用健康服务并补启动缺失的一侧。
-未知程序占用 3000 或 8000 时仍会显示端口和 PID，不会误杀或把前端连接到错误后端。
-可传入 `--no-repair` 禁用残留进程自动恢复。每次启动的最新后端和前端输出分别写入
-`logs/api.log` 与 `logs/web.log`，启动失败时终端还会显示日志尾部。脚本就绪后会打开
-`http://127.0.0.1:3000`。终端只显示服务状态；
-按 `Ctrl+C` 同时停止 API 与 Web。传入 `--no-browser` 可禁止自动打开浏览器，
-已有生产构建时可传入 `--production`。维护时可运行
-`.\start.ps1 --no-pause --no-browser --smoke-test`，它会验证两个服务就绪后立即清理退出。
-页面采用弹性 Grid 与 `minmax()`
-分配空间，优先适配不同电脑窗口宽度；手机端专项布局留到最终验收阶段。
+Agent 会根据本地证据和配置生成计划，必要时依次执行采集、统一检索、推荐和趋势总结，
+并在界面中显示步骤状态、信息引用、证据边界和运行详情。
 
-普通工作区首次启动会准备 OpenAI 官方 RSS、LangGraph Releases 和
-Transformers Releases 三个真实来源；来源可以在设置页停用或继续添加。
-固定 Demo 数据仅用于自动化测试。Workspace Agent 对话保存在本地 SQLite，
-刷新页面会恢复消息和 Capability 执行状态。上传的文档和图片先经类型、Magic Bytes、
-大小与 Digest 校验后保存为本地 Artifact；消息和 Graph State 只保存 Artifact ID。
+## 工作原理
 
-首次运行默认使用离线 `heuristic` Provider，API Key 为空。没有配置模型时，时间线、
-筛选、来源、任务、审核、卡片和确定性研究功能仍可使用；配置支持 Tool Calling 的模型
-后，无需修改源码即可使用自然语言 Workspace Agent。
+```mermaid
+flowchart TB
+    Web["Next.js Web"] --> API["FastAPI REST / WebSocket"]
+    Web --> Stream["Agent SSE Event Stream"]
 
-## 接入真实 API Key
+    API --> Core["Capability Registry + Policy"]
+    Stream --> Runtime["Workspace Agent Runtime"]
+    Runtime --> LC["LangChain Agent"]
+    Runtime --> LG["LangGraph StateGraph"]
+    LC --> Core
+    LG --> Core
 
-Python 依赖安装在 `.venv/`。不要把密钥写进 `.venv`、源码、前端变量或文档。
+    Core --> Services["Application Services"]
+    Services --> Modules["Collection / Intelligence / Task / Review / Card / Assets"]
+    Modules --> SQLite["SQLite + FTS5"]
+    Modules --> Files["Agent Pack + Artifact"]
+    Modules --> Adapters["LLM / Search / STT / Renderer Adapters"]
+```
 
-1. 运行 `.\start.ps1`；
-2. 在对话页点击“设定模型”进入 `/settings/models`；
-3. 选择 Provider 预设，填写 API Key、模型 ID 与能力；
-4. 保存后确认模型显示“密钥已配置”；
-5. 点击模型行的连接图标执行真实连接测试。
+### 统一能力内核
 
-工作区模型密钥保存在 Git 忽略的
-`config/model-secrets.local.json`，模型信息保存在
-`config/models.local.json`；两者都不会由 API 返回明文。
-`.env` 中的旧 `AI_SIGNAL_LLM_*` 字段只用于首次迁移兼容。
-搜索和 GitHub 密钥仍通过根目录 `.env` 配置。
+仓库当前定义了 37 项机器可读 Capability 契约。Web、Workspace Agent、调度器和未来的
+协议 Adapter 都只能通过 Capability/Application Service 执行业务动作；Router、Tool
+和 Graph Node 不复制业务规则。
 
-## 本地数据、备份与重置
+### 可恢复 Agent Runtime
 
-以下目录和文件只属于当前设备，并已被 Git 与发布 Guard 排除：
+LangChain 负责模型调用、动态 Prompt/Tool、结构化输出和 Agent Loop；LangGraph 负责
+计划编排、并行、Checkpoint、流式事件、审批暂停、恢复、重试和结果合并。当前
+Workspace Agent 工作流版本为 `0.8.0`，机器规格见
+[Agent Task Graph](graph-specs/02-module-review-agent/02-agent-task-graph.yaml)。
+
+### 模块化单体
+
+项目保持单机可运行的模块化单体，通过 Pydantic Schema、Python Protocol、Capability、
+Repository 和 Adapter 管理边界。只有跨步骤长流程进入 LangGraph，普通 CRUD 继续由
+Application Service 处理；在出现真实部署压力前不拆分微服务。
+
+## 技术栈
+
+| 层级 | 技术 |
+| --- | --- |
+| Web | Next.js 16、React 19、TypeScript、TanStack Query、Tabler Icons |
+| API | Python 3.12、FastAPI、Pydantic、SQLAlchemy |
+| Agent | LangChain、LangGraph、SQLite Checkpointer |
+| 数据 | SQLite、本地文件存储、FTS5 |
+| 调度 | APScheduler |
+| 内容渲染 | HTML/CSS、Playwright |
+| 语音 | WebSocket、WhisperLive Adapter |
+| 质量 | pytest、Vitest、Playwright、ESLint、JSON Schema、Gitleaks |
+
+## 当前质量基线
+
+最新确定性验收记录：
+
+- 后端：`165 passed`，专用真实模型用例默认排除；
+- 契约：`3 passed`；
+- 前端单元测试：`13 passed`；
+- Playwright：`13/13 passed`；
+- ESLint 与 Next.js 生产构建通过；
+- Release Safety 的 worktree、tracked、history 检查通过；
+- 专用真实模型链路已使用 `qwen3.7-plus` 完成验收。
+
+真实模型不会混入普通 pytest、Vitest 或 Playwright。日常测试使用 Fake、Fixture 或 Mock；
+只有核心功能的确定性回归全部通过后，才通过专用命令显式开启完整链路验收。
+
+```powershell
+# 后端、契约、前端单元测试、代码检查和生产构建
+.\scripts\verify.ps1
+
+# 在上述检查之外运行桌面端 Playwright 流程
+.\scripts\verify.ps1 -E2E
+
+# 仅运行 Agent Runtime 模块测试
+.\.venv\Scripts\python.exe -m pytest tests/modules/agent_runtime -q
+```
+
+## 本地数据与安全
+
+以下内容仅属于当前设备，并由 Git 忽略和发布 Guard 保护：
 
 ```text
 .env
@@ -150,29 +277,109 @@ backups/
 agent-packs/local/
 ```
 
-Agent Pack 的版本化示例位于 `agent-packs/examples/`；首次运行会复制到
-`data/agent-packs/`，运行时编辑不会改写仓库示例。Artifact、SQLite 数据、Checkpoint
-和转写会话也只保存在 `data/`。默认不保存原始麦克风音频。
+- 上传文件经过扩展名、MIME、Magic Bytes、大小和 Digest 校验；
+- 网页抓取会检查公网地址、DNS、重定向、凭据 URL、MIME 和响应大小；
+- 外部网页、Agent Pack 和未来 MCP Resource 都被视为不可信内容；
+- Agent 消息与 Graph State 只保存 Artifact ID，不保存图片二进制或完整大文档；
+- 默认不保存原始麦克风音频；
+- 删除默认使用软删除或状态变更，高风险动作按策略要求审批。
 
-备份前先停止应用，然后复制 `.env`、`config/*.local.json` 与 `data/` 到受保护位置。
-重置时同样先停止应用，再自行备份并删除这些本地路径；下次启动会恢复安全默认。仓库
-不会主动上传 API Key、本地数据库、Agent Pack、对话、来源、任务、Artifact 或日志。
+备份前停止应用，然后复制 `.env`、`config/*.local.json` 和 `data/` 到受保护位置。除非
+用户配置并触发模型、搜索、GitHub 或转写 Provider，仓库不会主动向外部服务发送本地
+数据；密钥、本地数据库、完整 Agent Pack、日志和 Artifact 文件不会作为普通业务数据
+上传。
 
-## 发布与安全检查
+## 项目状态与路线图
 
-```powershell
-.\.venv\Scripts\python.exe scripts/check_release_safety.py --worktree
-.\.venv\Scripts\python.exe scripts/check_release_safety.py --tracked
-.\.venv\Scripts\python.exe scripts/check_release_safety.py --history
+### 已形成桌面闭环
+
+- 版本化采集任务、试运行和定时调度；
+- 多来源采集、统一检索和按需联网补证；
+- 信息时间线、保存视图和本地状态；
+- 多会话 Workspace Agent、可恢复执行和结构化结果；
+- Agent Pack、Rules、Skills、Artifact 和实时转写；
+- 批量审核、卡片编辑、审批和 PNG 渲染；
+- 模型配置、搜索模型、主题与运行记录。
+
+### 继续建设
+
+- 运行详情中的逐来源耗时、重试和差异比较；
+- 任务版本历史与恢复界面；
+- 来源分组、批量测试、限速与凭据状态；
+- 专题板、周报和可导出知识交付物；
+- 更完整的 Review Graph 审批恢复；
+- 桌面验收完成后的移动端专项设计。
+
+### 明确延后
+
+- 可运行的外部 MCP/A2A Agent Gateway；
+- 通用拖拽工作流平台；
+- 插件市场和多租户 SaaS；
+- 微服务、分布式队列和通用多 Agent 平台。
+
+外部 Agent Gateway 的设计已经完成，但在外部身份、Scope、审批和审计边界稳定前不会
+开放运行端口或写能力。详见
+[外部 Agent Gateway 设计](docs/04-module-poster-interop/04-02-external-agent-gateway-design.md)。
+
+## 文档导航
+
+| 内容 | 入口 |
+| --- | --- |
+| 完整文档索引 | [docs/README.md](docs/README.md) |
+| 产品目标与非目标 | [项目章程](docs/00-project/00-01-project-charter.md) |
+| 用户流程 | [产品范围与用户流程](docs/00-project/00-02-product-and-user-flows.md) |
+| 系统架构 | [系统架构](docs/00-project/00-03-system-architecture.md) |
+| Capability 契约 | [Capability Contract](docs/05-platform/05-01-capability-contract.md) |
+| Agent 上下文与工作流 | [Context Engineering](docs/02-module-review-agent/02-03-agent-context-engineering-and-workflows.md) |
+| Agent 工程蓝图 | [Final Agent Engineering Blueprint](docs/02-module-review-agent/02-05-final-agent-engineering-blueprint.md) |
+| 测试策略 | [Simple TDD](docs/06-quality-operations/06-01-simple-tdd-and-testing.md) |
+| 安全与审批 | [Security and Approval](docs/06-quality-operations/06-03-security-and-approval.md) |
+| 当前实现状态 | [Optimization Implementation Status](docs/07-delivery/07-04-optimization-implementation-status.md) |
+
+按模块阅读：
+
+| 模块 | 内容 |
+| --- | --- |
+| 01 | [AI 信息与采集](docs/01-module-timeline/01-00-overview.md) |
+| 02 | [审核工作台与 Workspace Agent](docs/02-module-review-agent/02-00-overview.md) |
+| 03 | [Agent Pack、Artifact 与实时转写](docs/03-module-agent-assets-stt/03-00-overview.md) |
+| 04 | [信息卡片与外部接口设计](docs/04-module-poster-interop/04-00-overview.md) |
+
+## 仓库结构
+
+```text
+.
+├── apps/web/              # Next.js 产品界面
+├── apps/api/              # FastAPI 组合根、Router 与业务模块
+├── agent-packs/           # 可版本化 Agent Pack 示例
+├── contracts/             # Capability、模型、设计系统等机器契约
+├── docs/                  # 产品、模块、平台、质量与交付文档
+├── graph-specs/           # LangGraph 机器规格
+├── prompts/               # 模块实施提示词
+├── scripts/               # 安装、启动、验证和发布安全脚本
+├── tests/                 # 后端、契约、Graph、评测与完整链路测试
+└── vendor_tools/          # 第三方工具与业务 Adapter 隔离区
 ```
 
-Guard 只报告规则、文件和行号，不回显疑似 Secret。Gitleaks 的固定版本 pre-commit 与
-完整历史 GitHub Action 是第二道独立门禁。仓库当前未包含 LICENSE；公开分发前需要由
-仓库所有者选择许可证。
+## 参与开发
 
-## 当前范围
+开始修改前，请先阅读 [AGENTS.md](AGENTS.md) 和对应模块的 `XX-00-overview.md`：
 
-任务、统一信息库、审核工作台、卡片/海报、可恢复 Workspace Agent、Agent Pack、
-Artifact 与实时转写已经形成桌面核心闭环。E5 外部 A2A/MCP Agent Gateway 继续
-Deferred；它不会因本地 Poster Graph 完成而自动开放。最新验证证据见
-[07-04 实现状态](docs/07-delivery/07-04-optimization-implementation-status.md)。
+1. 运行现有测试基线；
+2. 为一个完整用户行为增加 2～6 个关键测试；
+3. 先完成 Application Capability，再接入 REST、Agent Tool 和界面；
+4. 修改 Schema 时同步更新契约、示例和测试；
+5. 修改 Workspace Agent 工作流时，同步 Graph Spec、历史图、实现状态、Figma 和测试。
+
+问题与建议可以通过 [GitHub Issues](https://github.com/WNIK7750/ai-signal-studio/issues) 提交。
+
+## 授权计划
+
+项目计划采用“**源码公开、允许学习与非商业使用、商业使用需另行授权**”的方式发布。
+这类许可严格来说属于 source-available，而不是 OSI 定义下允许任何商业用途的 Open
+Source。
+
+当前仓库尚未提交正式 `LICENSE`，因此上述计划尚未构成许可授权。在许可证落地前，
+默认保留全部权利。候选方案为面向软件设计的
+[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)；
+最终采用前还需要确认商业授权方式、版权声明以及第三方依赖和素材的许可证兼容性。

@@ -376,6 +376,7 @@ class ModelConfigRead(BaseModel):
     output_token_limit: int | None
     enabled: bool
     is_default: bool
+    is_search_model: bool
     connection_status: Literal[
         "pending",
         "healthy",
@@ -397,6 +398,7 @@ class ProviderConfigRead(BaseModel):
     base_url: str
     protocol: ModelProvider
     has_api_key: bool
+    model_names: list[str]
 
 
 class ModelConnectionRead(BaseModel):

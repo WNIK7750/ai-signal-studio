@@ -80,6 +80,9 @@ test("create, manually switch, and track connection state for an image model", a
     .filter({ hasText: editedModelName });
   await expect(editedModelRow).toContainText("最大输出 32K");
   await expect(editedModelRow).toContainText("待检测");
+  await editedModelRow.getByRole("button", { name: "设为搜索" }).click();
+  await expect(editedModelRow).toContainText("当前搜索");
+  await expect(editedModelRow).toContainText("搜索模型");
   await page.screenshot({
     path: path.join(
       process.env.TEMP ?? ".",

@@ -9,6 +9,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { AppShell } from "@/components/app-shell";
+import { useMemo, useState } from "react";
 import {
   api,
   CapabilityInvocation,
@@ -16,11 +17,40 @@ import {
 } from "@/lib/api";
 
 export default function RunsPage() {
+  const [invocationView, setInvocationView] = useState("all");
   const runs = useQuery({ queryKey: ["runs"], queryFn: api.runs });
   const invocations = useQuery({
     queryKey: ["capability-invocations"],
     queryFn: api.invocations,
   });
+  const invocationViews = useMemo(() => {
+    const items = invocations.data ?? [];
+    const definitions = [
+      ["all", "全部", () => true],
+      ["information", "信息处理", (id: string) =>
+        /^(collection|intelligence|research|review)\./.test(id)],
+      ["agent", "Agent", (id: string) =>
+        /^(agent|conversation|model|task)\./.test(id)],
+      ["content", "内容产物", (id: string) =>
+        /^(card|artifact|poster)\./.test(id)],
+      ["other", "其他", (id: string) =>
+        !/^(collection|intelligence|research|review|agent|conversation|model|task|card|artifact|poster)\./.test(id)],
+    ] as const;
+    return definitions
+      .map(([id, label, match]) => ({
+        id,
+        label,
+        match,
+        count: items.filter((item) => match(item.capability_id)).length,
+      }))
+      .filter((view) => view.id === "all" || view.count > 0);
+  }, [invocations.data]);
+  const visibleInvocations = useMemo(() => {
+    const selected = invocationViews.find((view) => view.id === invocationView);
+    return (invocations.data ?? []).filter(
+      (item) => !selected || selected.match(item.capability_id),
+    );
+  }, [invocationView, invocationViews, invocations.data]);
   return (
     <AppShell>
       <header className="topbar">
@@ -34,8 +64,20 @@ export default function RunsPage() {
           </div>
           <span>{invocations.data?.length ?? 0} 次</span>
         </div>
+        <div className="view-switcher" aria-label="能力调用分类">
+          {invocationViews.map((view) => (
+            <button
+              key={view.id}
+              className={invocationView === view.id ? "selected" : ""}
+              aria-pressed={invocationView === view.id}
+              onClick={() => setInvocationView(view.id)}
+            >
+              {view.label}<span>{view.count}</span>
+            </button>
+          ))}
+        </div>
         <div className="source-list">
-          {invocations.data?.map((invocation: CapabilityInvocation) => (
+          {visibleInvocations.map((invocation: CapabilityInvocation) => (
             <article className="source-card" key={invocation.id}>
               <span className="source-icon"><IconBolt size={20} /></span>
               <div>

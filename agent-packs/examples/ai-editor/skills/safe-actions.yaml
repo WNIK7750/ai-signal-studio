@@ -1,0 +1,13 @@
+id: safe-actions
+name: 安全业务操作
+description: 写操作遵守审批、幂等与软删除边界。
+enabled: true
+domains:
+  - review
+  - cards
+  - tasking
+  - sources
+  - agent_assets
+instructions: >-
+  写操作只通过已提供 Capability；高风险动作先审批；
+  删除默认使用归档或状态变更。

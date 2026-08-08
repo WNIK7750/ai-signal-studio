@@ -22,6 +22,10 @@ from ai_signal_api.modules.collection.web_discovery import (
     WebSearchCollectResult,
 )
 from ai_signal_api.integrations.search.brave import BraveWebSearchProvider
+from ai_signal_api.integrations.search.model import (
+    FallbackWebSearchProvider,
+    ModelWebSearchProvider,
+)
 from ai_signal_api.modules.agent.conversation_service import (
     AgentConversationService,
 )
@@ -110,15 +114,33 @@ def build_capability_executor(
         session,
         analyzer=build_analyzer(settings),
     )
-    search_provider = None
+    model_configuration = build_model_configuration_service(settings)
+    search_model = model_configuration.select_for_search()
+    search_providers = []
+    if search_model is not None:
+        search_providers.append(
+            ModelWebSearchProvider(
+                search_model,
+                timeout_seconds=settings.llm_timeout_seconds,
+            )
+        )
     if (
         settings.search_api_key is not None
         and settings.search_api_key.get_secret_value().strip()
     ):
-        search_provider = BraveWebSearchProvider(
-            settings.search_api_key.get_secret_value().strip(),
-            base_url=settings.search_base_url,
+        search_providers.append(
+            BraveWebSearchProvider(
+                settings.search_api_key.get_secret_value().strip(),
+                base_url=settings.search_base_url,
+            )
         )
+    search_provider = (
+        FallbackWebSearchProvider(search_providers)
+        if len(search_providers) > 1
+        else search_providers[0]
+        if search_providers
+        else None
+    )
     web_discovery = WebDiscoveryService(
         session,
         collection,
@@ -135,7 +157,6 @@ def build_capability_executor(
     sources = SourceService(session)
     library = InformationLibraryService(session)
     conversations = AgentConversationService(session)
-    model_configuration = build_model_configuration_service(settings)
     agent_packs = AgentPackService(session, settings.agent_pack_root)
     artifacts = ArtifactService(
         session,

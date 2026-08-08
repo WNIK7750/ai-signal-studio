@@ -910,3 +910,26 @@ Plan/Context/N16/N18/ResultBlock 契约。
   不抓取消费者搜索结果页；
 - 同步：Graph Spec、历史、本文、状态、能力契约与测试升级到 0.7.0；Figma 仍需
   对既定 FigJam 的明确写入授权和截图核验。
+
+### 17.3 Blueprint Change Proposal：版本化 Rules / Skills 与模型原生搜索
+
+状态：**用户已明确要求并接受最小修改；按 `workflow_version=0.8.0` 实施。**
+
+- 问题证据：静态 Prompt 无法保存用户的语言、证据和输出习惯；所有工具说明常驻会
+  挤占 Context；单独配置 Search API 对本地用户步骤过多；
+- 最小修改：在既有 Agent Pack 增加 `rules_path` 与 `skill_paths`，由 N04 Context
+  Assembler 按本轮 Domain 选择启用 Skill；不增加新的 Graph 节点或第二套 Runtime；
+- 默认能力：内置“证据优先”“中文清晰输出”“安全动作”三项 Skill。旧 Pack 读取时
+  虚拟补齐，首次保存后写入不可变新版本；
+- 可追溯性：Execution Manifest 固定 `agent_pack_version`，Context Trace 记录
+  `workspace-rules-skills` 层和压缩情况；
+- 搜索兼容：模型页可选择唯一外部模型承担联网搜索；Provider Adapter 使用
+  OpenAI-compatible Responses `web_search`，覆盖 OpenAI 与阿里云百炼等兼容端点，
+  只把 URL Citation 交给既有安全抓取、缓存和 Evidence 正常化链；独立 Search API
+  可作为后备；
+- UI：Rules、Skills、版本使用同一 Agent Pack 顶部内容切换；运行记录和 Artifact
+  采用少量、动态隐藏空项的粗粒度分类，未知能力不因分类枚举而丢失；
+- 复杂度与回退：关闭搜索模型角色即回到 Search API；恢复旧 Agent Pack 即回到旧
+  Rules / Skills。新 Turn 使用 0.8.0，旧 Turn 保持只读；
+- 同步：Graph Spec、历史、本文、Context 设计、交付状态、契约、测试与 Figma 使用
+  `workflow_version=0.8.0`。

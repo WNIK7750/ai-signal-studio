@@ -77,7 +77,7 @@ paths:
         schema: {type: string}
     post:
       operationId: createAgentTurn
-      summary: Persist an idempotent Agent turn and start the 0.7.0 graph
+      summary: Persist an idempotent Agent turn and start the 0.8.0 graph
       requestBody:
         required: true
         content:
@@ -141,7 +141,7 @@ paths:
   /api/agent-runs:
     post:
       operationId: runWorkspaceAgentTurn
-      summary: Compatibility adapter that delegates to the same 0.7.0 Turn Runtime
+      summary: Compatibility adapter that delegates to the same 0.8.0 Turn Runtime
       responses:
         '200':
           description: Persisted Agent response and capability calls

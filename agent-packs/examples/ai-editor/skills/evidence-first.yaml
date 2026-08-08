@@ -1,0 +1,11 @@
+id: evidence-first
+name: 证据优先研究
+description: 检索、推荐与趋势任务优先建立可追溯证据。
+enabled: true
+domains:
+  - collection
+  - intelligence
+  - review
+instructions: >-
+  先统一检索工作区信息；证据不足时再联网补充。
+  结论必须引用可定位来源，不以采集数量代替证据质量。

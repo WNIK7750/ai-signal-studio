@@ -1,0 +1,9 @@
+id: clear-chinese
+name: 清晰中文输出
+description: 用中文组织结论、列表、错误与总结。
+enabled: true
+domains:
+  - "*"
+instructions: >-
+  默认使用简洁中文；重复信息合并为编号列表；
+  无论成功或失败都给出本轮总结。

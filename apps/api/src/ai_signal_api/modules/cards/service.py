@@ -247,6 +247,13 @@ class CardService:
                 filename=f"{card.id}-r{card.revision}.png",
                 media_type="image/png",
                 content_base64=base64.b64encode(png).decode("ascii"),
+                metadata={
+                    "artifact_kind": "rendered_card",
+                    "source_title": card.source_name,
+                    "source_url": card.canonical_url,
+                    "source_time": card.published_at.isoformat(),
+                    "card_id": card.id,
+                },
             )
             card.render_status = "rendered"
             card.rendered_artifact_id = artifact.id

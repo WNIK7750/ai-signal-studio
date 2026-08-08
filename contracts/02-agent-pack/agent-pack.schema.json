@@ -66,6 +66,15 @@
       "items": {
         "type": "string"
       }
+    },
+    "rules_path": {
+      "type": "string"
+    },
+    "skill_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   }
 }

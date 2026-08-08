@@ -5,12 +5,15 @@ import {
   IconArchive,
   IconCheck,
   IconFile,
+  IconExternalLink,
   IconPackage,
+  IconPlus,
+  IconTrash,
   IconUpload,
 } from "@tabler/icons-react";
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { api } from "@/lib/api";
+import { AgentSkill, api } from "@/lib/api";
 
 export function AssetsScreen() {
   const queryClient = useQueryClient();
@@ -19,10 +22,30 @@ export function AssetsScreen() {
   const [activePackId, setActivePackId] = useState("");
   const [preferenceText, setPreferenceText] = useState("");
   const [nextVersion, setNextVersion] = useState("1.1.0");
+  const [packView, setPackView] = useState("rules");
+  const [rules, setRules] = useState("");
+  const [skills, setSkills] = useState<AgentSkill[]>([]);
+  const [loadedCustomizationVersion, setLoadedCustomizationVersion] =
+    useState("");
+  const [artifactView, setArtifactView] = useState("all");
   const artifacts = useQuery({
     queryKey: ["artifacts"],
     queryFn: api.artifacts,
   });
+  const customization = useQuery({
+    queryKey: ["agent-pack-customization", "ai-editor"],
+    queryFn: () => api.agentPackCustomization("ai-editor"),
+  });
+  if (
+    customization.data
+    && customization.data.version !== loadedCustomizationVersion
+  ) {
+    setRules(customization.data.rules);
+    setSkills(customization.data.skills);
+    setNextVersion(nextPatchVersion(customization.data.version));
+    setActivePackId(customization.data.pack_id);
+    setLoadedCustomizationVersion(customization.data.version);
+  }
   const versions = useQuery({
     queryKey: ["agent-pack-versions", activePackId],
     queryFn: () => api.agentPackVersions(activePackId),
@@ -59,6 +82,22 @@ export function AssetsScreen() {
         queryKey: ["agent-pack-versions", activePackId],
       }),
   });
+  const saveCustomization = useMutation({
+    mutationFn: () =>
+      api.saveAgentPackCustomization("ai-editor", {
+        version: nextVersion,
+        rules,
+        skills,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["agent-pack-customization", "ai-editor"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["agent-pack-versions", "ai-editor"],
+      });
+    },
+  });
   const uploadArtifact = useMutation({
     mutationFn: async (file: File) =>
       api.createArtifact({
@@ -69,6 +108,33 @@ export function AssetsScreen() {
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["artifacts"] }),
   });
+  const artifactViews = useMemo(() => {
+    const items = artifacts.data ?? [];
+    const definitions = [
+      ["all", "全部", () => true],
+      ["generated", "生成内容", (item: (typeof items)[number]) =>
+        item.metadata.artifact_kind === "rendered_card"],
+      ["image", "图片", (item: (typeof items)[number]) =>
+        item.media_type.startsWith("image/")
+        && item.metadata.artifact_kind !== "rendered_card"],
+      ["document", "文档", (item: (typeof items)[number]) =>
+        !item.media_type.startsWith("image/")],
+    ] as const;
+    return definitions
+      .map(([id, label, match]) => ({
+        id,
+        label,
+        match,
+        count: items.filter(match).length,
+      }))
+      .filter((view) => view.id === "all" || view.count > 0);
+  }, [artifacts.data]);
+  const visibleArtifacts = useMemo(() => {
+    const selected = artifactViews.find((view) => view.id === artifactView);
+    return (artifacts.data ?? []).filter(
+      (item) => !selected || selected.match(item),
+    );
+  }, [artifactView, artifactViews, artifacts.data]);
 
   async function choosePack(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -109,6 +175,147 @@ export function AssetsScreen() {
               onChange={(event) => void choosePack(event)}
             />
           </label>
+          <div className="view-switcher asset-editor-switcher" aria-label="Agent Pack 编辑区">
+            {[
+              ["rules", "Rules"],
+              ["skills", "Skills"],
+              ["versions", "版本"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                className={packView === id ? "selected" : ""}
+                aria-pressed={packView === id}
+                onClick={() => setPackView(id)}
+              >
+                {label}
+                {id === "skills" && <span>{skills.length}</span>}
+              </button>
+            ))}
+          </div>
+          {packView === "rules" && (
+            <div className="rules-editor">
+              <label>
+                工作区规则
+                <textarea
+                  value={rules}
+                  onChange={(event) => setRules(event.target.value)}
+                  placeholder="定义语言、证据、安全与输出习惯。"
+                />
+              </label>
+            </div>
+          )}
+          {packView === "skills" && (
+            <div className="skills-editor">
+              {skills.map((skill, index) => (
+                <article key={skill.id}>
+                  <div className="skill-editor-heading">
+                    <label className="check-control">
+                      <input
+                        type="checkbox"
+                        checked={skill.enabled}
+                        onChange={(event) =>
+                          updateSkill(setSkills, index, {
+                            enabled: event.target.checked,
+                          })
+                        }
+                      />
+                      启用
+                    </label>
+                    <button
+                      className="icon-button"
+                      aria-label={`删除 Skill ${skill.name}`}
+                      onClick={() =>
+                        setSkills((items) =>
+                          items.filter((_, itemIndex) => itemIndex !== index)
+                        )
+                      }
+                    >
+                      <IconTrash size={16} />
+                    </button>
+                  </div>
+                  <input
+                    value={skill.name}
+                    aria-label="Skill 名称"
+                    onChange={(event) =>
+                      updateSkill(setSkills, index, { name: event.target.value })
+                    }
+                  />
+                  <input
+                    value={skill.description}
+                    aria-label="Skill 说明"
+                    placeholder="说明这个 Skill 解决什么问题"
+                    onChange={(event) =>
+                      updateSkill(setSkills, index, {
+                        description: event.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    value={skill.domains.join(", ")}
+                    aria-label="适用 Domain"
+                    onChange={(event) =>
+                      updateSkill(setSkills, index, {
+                        domains: event.target.value
+                          .split(",")
+                          .map((value) => value.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                  />
+                  <textarea
+                    value={skill.instructions}
+                    aria-label="Skill 指令"
+                    onChange={(event) =>
+                      updateSkill(setSkills, index, {
+                        instructions: event.target.value,
+                      })
+                    }
+                  />
+                </article>
+              ))}
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  setSkills((items) => [
+                    ...items,
+                    {
+                      id: `custom-skill-${Date.now()}`,
+                      name: "自定义 Skill",
+                      description: "用户自定义工作方式",
+                      enabled: true,
+                      domains: ["*"],
+                      instructions: "请填写可执行、可验证的工作指令。",
+                    },
+                  ])
+                }
+              >
+                <IconPlus size={16} /> 添加 Skill
+              </button>
+            </div>
+          )}
+          {(packView === "rules" || packView === "skills") && (
+            <div className="customization-save">
+              <label>
+                新版本
+                <input
+                  value={nextVersion}
+                  onChange={(event) => setNextVersion(event.target.value)}
+                  pattern="[0-9]+\.[0-9]+\.[0-9]+"
+                />
+              </label>
+              <button
+                className="primary-button"
+                onClick={() => saveCustomization.mutate()}
+                disabled={
+                  !rules.trim()
+                  || skills.length === 0
+                  || saveCustomization.isPending
+                }
+              >
+                {saveCustomization.isPending ? "正在保存" : "保存 Rules / Skills"}
+              </button>
+            </div>
+          )}
           {preview.data && (
             <div className="pack-preview" role="status">
               <strong>
@@ -157,7 +364,7 @@ export function AssetsScreen() {
               </button>
             </div>
           )}
-          <div className="pack-versions">
+          {packView === "versions" && <div className="pack-versions">
             {versions.data?.map((version) => (
               <article key={version.id}>
                 <div>
@@ -176,7 +383,7 @@ export function AssetsScreen() {
                 )}
               </article>
             ))}
-          </div>
+          </div>}
         </section>
 
         <section className="asset-section">
@@ -203,8 +410,20 @@ export function AssetsScreen() {
               }}
             />
           </label>
+          <div className="view-switcher artifact-switcher" aria-label="Artifact 分类">
+            {artifactViews.map((view) => (
+              <button
+                key={view.id}
+                className={artifactView === view.id ? "selected" : ""}
+                aria-pressed={artifactView === view.id}
+                onClick={() => setArtifactView(view.id)}
+              >
+                {view.label}<span>{view.count}</span>
+              </button>
+            ))}
+          </div>
           <div className="artifact-list">
-            {artifacts.data?.map((artifact) => (
+            {visibleArtifacts.map((artifact) => (
               <article key={artifact.artifact_id}>
                 <IconFile size={18} />
                 <div>
@@ -213,8 +432,25 @@ export function AssetsScreen() {
                     {artifact.media_type} ·{" "}
                     {Math.ceil(artifact.size_bytes / 1024)} KB
                   </small>
+                  <span className="artifact-source">
+                    <b>{artifact.source_title}</b>
+                    <time dateTime={artifact.source_time}>
+                      {new Date(artifact.source_time).toLocaleString("zh-CN")}
+                    </time>
+                    {artifact.source_url && (
+                      <a
+                        href={artifact.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <IconExternalLink size={13} /> 查看来源
+                      </a>
+                    )}
+                  </span>
                 </div>
-                <code>{artifact.artifact_id}</code>
+                <code title={artifact.artifact_id}>
+                  {artifact.artifact_id.slice(0, 18)}…
+                </code>
               </article>
             ))}
           </div>
@@ -241,4 +477,23 @@ function mediaTypeFromName(filename: string) {
     return "application/yaml";
   }
   return "text/plain";
+}
+
+function nextPatchVersion(version: string) {
+  const [major = 1, minor = 0, patch = 0] = version
+    .split(".")
+    .map(Number);
+  return `${major}.${minor}.${patch + 1}`;
+}
+
+function updateSkill(
+  setSkills: React.Dispatch<React.SetStateAction<AgentSkill[]>>,
+  index: number,
+  patch: Partial<AgentSkill>,
+) {
+  setSkills((items) =>
+    items.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, ...patch } : item
+    )
+  );
 }

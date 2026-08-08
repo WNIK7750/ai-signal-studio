@@ -1,6 +1,6 @@
 id: ai-editor
 name: AI 情报编辑助手
-version: 0.1.0
+version: 0.2.0
 description: 收集、整理和审核 AI 情报，并在确认后生成卡片草稿。
 default_language: zh-CN
 entrypoints:
@@ -17,3 +17,8 @@ memory_paths:
 knowledge_paths:
   - knowledge/topics.md
   - knowledge/trusted-sources.yaml
+rules_path: rules/workspace.md
+skill_paths:
+  - skills/evidence-first.yaml
+  - skills/clear-chinese.yaml
+  - skills/safe-actions.yaml

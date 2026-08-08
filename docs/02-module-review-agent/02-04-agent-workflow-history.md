@@ -25,7 +25,8 @@
 | `0.4.0` | 2026-08-05 | 已被 0.5.0 替代 | Context + Harness、Fast/LLM Plan、动作绑定后审批、DAG 调度与汇合、Evidence、评测和适配性审查 | [打开可编辑 FigJam](https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad) |
 | `0.5.0` | 2026-08-06 | 已被 0.6.0 替代 | 单一 Turn Runtime、Goal Coverage、会话窗口、精确时间窗、可验证推荐与综合分析、完整 ResultBlock SSE | [打开可编辑 FigJam](https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad) |
 | `0.6.0` | 2026-08-06 | 已被 0.7.0 替代 | 工具可选规划、所选模型语境推理、条目级有界会话结果、按变更/故障检测模型连接 | [打开可编辑 FigJam](https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad) |
-| `0.7.0` | 2026-08-07 | 当前实现，全部同步 | 跨阶段统一检索、近重复合并、抓取缓存、按需联网补证、模型分级打标与跨 Provider 计划规范化 | [同一 FigJam，0.7.0 当前图与 Release Sync 区](https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad) |
+| `0.7.0` | 2026-08-07 | 已被 0.8.0 替代 | 跨阶段统一检索、近重复合并、抓取缓存、按需联网补证、模型分级打标与跨 Provider 计划规范化 | [同一 FigJam，0.7.0 图](https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad) |
+| `0.8.0` | 2026-08-07 | 当前实现，全部同步并验收通过 | Agent Pack Rules / Skills 动态上下文、模型原生联网搜索、可扫描运行与 Artifact 视图 | [同一 FigJam，节点 15:364](https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad) |
 
 ---
 
@@ -672,3 +673,83 @@ flowchart LR
   `12:364`；
 - `12:364` 回读包含 `workflow 0.7.0` 与 `context 1.3.0`，截图核验无裁切、无重叠，
   旧版本节点和 `0.4.0 Release sync` 区均保留，未新建替代文件。
+
+---
+
+## 0.8.0：可配置 Rules / Skills 与模型原生联网搜索
+
+状态：代码、Graph Spec、契约、Figma、完整确定性回归与真实模型验收已全部同步
+
+日期：2026-08-07
+
+Graph Spec：[Agent Task Graph 0.8.0](../../graph-specs/02-module-review-agent/02-agent-task-graph.yaml)
+
+```mermaid
+flowchart LR
+    P[Active Agent Pack] --> R[Bounded Workspace Rules]
+    P --> S[Enabled Skills]
+    D[Selected Step Domains] --> F{Skill Selector}
+    S --> F
+    R --> C[Context Assembler 1.4]
+    F -->|最多 4 项| C
+    C --> A[Planner / Executor / Result Inspector]
+    M[Selected Search Model] --> W[Responses web_search Adapter]
+    W --> B[URL 引用 + 安全抓取 + 缓存]
+    B --> E[统一 Evidence]
+    E --> A
+```
+
+相对 0.7.0：
+
+- Active Agent Pack 增加版本化 `rules_path` 与 `skill_paths`；旧 Pack 缺少字段时读取
+  三项安全默认 Skill，用户保存后生成不可变新版本；
+- Rules 作为有界 Workspace Policy 注入，Skill 仅在启用且与当前步骤 Domain 匹配时
+  选择，单次最多 4 项；禁用 Skill 不进入模型上下文；
+- Turn Manifest 新增 `agent_pack_version`，Context Contract 升级为 `1.4.0`；
+- 模型设置支持唯一搜索模型角色；OpenAI 与阿里云百炼共用标准 Responses
+  `web_search` Adapter，Brave 环境配置保留为后备；
+- N01～N25 拓扑不变，变化集中在 Context 装配和现有
+  `web.search.collect` Provider Adapter，不新增第二套 Agent Runtime；
+- 运行记录和 Artifact 使用同一数据集的粗粒度视图切换；Artifact 显示来源标题、
+  时间和可用原始链接。
+
+Figma 同步证据：
+
+- Release Sync Section：`15:364`；
+- 业务节点：`16:366`～`16:399`；连接器：`17:388`～`17:436`；
+- 1800px 截图已核验：标题、两条链路、默认 Skill 说明均完整，无裁切或节点重叠；
+- 同板保留 0.7.0 Section `12:364`，本次仅追加 0.8.0，没有覆盖历史图。
+
+验证入口：
+
+- `tests/modules/agent_assets/test_agent_assets_product.py`；
+- `tests/modules/agent_runtime/test_context.py`；
+- `tests/api/test_model_configuration.py`；
+- `tests/modules/collection/test_web_discovery.py`。
+
+最终验收：
+
+- 后端全量：`162 passed, 1 deselected`；
+- 契约：`3 passed`；
+- 前端单元：`13 passed`，ESLint 与生产构建通过；
+- Playwright：`13/13`，包含搜索模型、Rules / Skills、Artifact 来源和动态运行分类；
+- 专用真实模型验收：`qwen3.7-plus`，`1 passed`；完整对话、三天追问与语境推理均走
+  `workflow_version=0.8.0`，没有把真实模型调用混入普通回归。
+
+### 0.8.0 热修复：旧系统默认 Agent Pack 兼容
+
+日期：2026-08-08
+
+- 工作流拓扑、版本和 Figma 节点不变；本次仅修复启动迁移与运行时容错；
+- 启动时会把旧的系统默认 Pack 升级到仓库内当前默认版本，但不会覆盖用户导入或编辑的
+  Active Pack；
+- 数据库已有相同版本但本地文件缺失或摘要不符时，会安装到新的内容寻址目录并修复索引，
+  不原地覆盖旧目录；
+- Active Pack 暂时不可用时，Context Assembler 使用有界内置 Rules / Skills 继续运行，并记录
+  `context.customization.fallback`；管理接口返回可定位的 `AGENT_PACK_MANIFEST_MISSING`，不再泄漏
+  未处理的 `KeyError`；
+- E2E 使用独立临时 Agent Pack 与 Artifact 根目录，避免测试状态污染真实工作区。
+
+验收证据：后端 `165 passed, 1 deselected`；契约 `3 passed`；前端 `13 passed`，ESLint、
+生产构建与 Playwright 通过；真实 `qwen3.7-plus` 新 Turn 为 `complete`，Manifest 记录
+`agent_pack_version=0.2.0`，页面无控制台错误。

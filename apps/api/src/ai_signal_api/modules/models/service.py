@@ -24,6 +24,7 @@ MODEL_ERROR_MESSAGES = {
     "MODEL-006": "模型返回内容无效",
     "MODEL-007": "内置模型不可修改",
     "MODEL-008": "内置模型无需连接测试",
+    "MODEL-009": "当前模型不支持原生联网搜索",
     "PROVIDER-001": "未找到指定提供商",
     "PROVIDER-002": "提供商配置不完整",
     "PROVIDER-003": "接口地址或模型 ID 不可用",
@@ -50,6 +51,7 @@ class ProviderSummary:
     base_url: str
     protocol: str
     has_api_key: bool
+    model_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,7 @@ class ResolvedModel:
     output_token_limit: int | None
     enabled: bool
     is_default: bool
+    is_search_model: bool = False
     connection_status: str = "pending"
     connection_checked_at: datetime | None = None
     connection_error_code: str | None = None
@@ -146,6 +149,7 @@ class LocalModelConfigStore:
                         "output_token_limit": None,
                         "enabled": True,
                         "is_default": True,
+                        "is_search_model": False,
                         "connection_status": "pending",
                         "connection_checked_at": None,
                         "connection_error_code": None,
@@ -164,6 +168,7 @@ class LocalModelConfigStore:
                         "output_token_limit": None,
                         "enabled": True,
                         "is_default": True,
+                        "is_search_model": False,
                         "connection_status": "not_applicable",
                         "connection_checked_at": None,
                         "connection_error_code": None,
@@ -283,6 +288,14 @@ class ModelConfigurationService:
                     has_api_key=bool(
                         secrets.get(provider["api_key_ref"])
                     ),
+                    model_names=tuple(
+                        model["name"]
+                        for model in config["models"]
+                        if (
+                            model.get("enabled", True)
+                            and model.get("provider_id") == provider["id"]
+                        )
+                    ),
                 )
                 for provider in config["providers"]
             ]
@@ -372,6 +385,7 @@ class ModelConfigurationService:
             "output_token_limit": values.get("output_token_limit"),
             "enabled": bool(values.get("enabled", True)),
             "is_default": is_default,
+            "is_search_model": False,
             "connection_status": "pending",
             "connection_checked_at": None,
             "connection_error_code": None,
@@ -537,6 +551,7 @@ class ModelConfigurationService:
         now = _utc_now().isoformat()
         model["enabled"] = False
         model["is_default"] = False
+        model["is_search_model"] = False
         model["updated_at"] = now
         if was_default:
             fallback = next(
@@ -585,6 +600,37 @@ class ModelConfigurationService:
             target,
             config["providers"],
             secrets,
+        )
+
+    def activate_search_model(self, model_id: str) -> ResolvedModel:
+        config = self.store.read_config()
+        secrets = self.store.read_secrets()
+        target = next(
+            (
+                model
+                for model in config["models"]
+                if model["id"] == model_id and model.get("enabled", True)
+            ),
+            None,
+        )
+        if target is None:
+            raise ModelConfigurationError("MODEL-001")
+        resolved = self._resolve_model(target, config["providers"], secrets)
+        if resolved.provider != "openai_compatible":
+            raise ModelConfigurationError("MODEL-009")
+        if not resolved.has_api_key:
+            raise ModelConfigurationError("SECRET-003")
+        now = _utc_now().isoformat()
+        for model in config["models"]:
+            model["is_search_model"] = model["id"] == model_id
+            model["updated_at"] = now
+        self.store.write_config(config)
+        return self._resolve_model(target, config["providers"], secrets)
+
+    def select_for_search(self) -> ResolvedModel | None:
+        return next(
+            (model for model in self.list_models() if model.is_search_model),
+            None,
         )
 
     def test_model_connection(self, model_id: str, model_chat: Any) -> None:
@@ -705,6 +751,7 @@ class ModelConfigurationService:
                 output_token_limit=model.get("output_token_limit"),
                 enabled=bool(model.get("enabled", True)),
                 is_default=bool(model.get("is_default")),
+                is_search_model=False,
                 connection_status="not_applicable",
                 connection_checked_at=None,
                 connection_error_code=None,
@@ -734,6 +781,7 @@ class ModelConfigurationService:
             output_token_limit=model.get("output_token_limit"),
             enabled=bool(model.get("enabled", True)),
             is_default=bool(model.get("is_default")),
+            is_search_model=bool(model.get("is_search_model", False)),
             connection_status=str(
                 model.get("connection_status", "pending")
             ),

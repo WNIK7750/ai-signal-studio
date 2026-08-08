@@ -1,6 +1,6 @@
 id: agent_task_graph
-version: 0.7.0
-workflow_version: 0.7.0
+version: 0.8.0
+workflow_version: 0.8.0
 status: target
 feature_flag: agent.langgraph_runtime
 schemas:
@@ -10,7 +10,7 @@ schemas:
   state_schema_version: 1.2.0
   plan_schema_version: 1.2.0
   event_schema_version: 1.2.0
-  context_contract_version: 1.3.0
+  context_contract_version: 1.4.0
 runtime:
   framework: langgraph
   agent_framework: langchain
@@ -52,6 +52,7 @@ execution_manifest:
     - event_schema_version
     - base_prompt_version
     - domain_pack_versions
+    - agent_pack_version
     - tool_catalog_version
     - model_config_ref
     - requested_model_id
@@ -76,6 +77,14 @@ domain_catalog:
     max_tools_per_model_call: 8
     disabled_capabilities_hidden: true
     forged_disabled_calls_rejected: true
+  workspace_customization:
+    source: active_agent_pack
+    rules: always_loaded_bounded
+    skills: selected_by_step_domains
+    max_selected_skills: 4
+    disabled_skills_hidden: true
+    unavailable_fallback: built-in-defaults
+    fallback_event: context.customization.fallback
   planning_contracts:
     collection.run.start:
       kind: capability
@@ -515,11 +524,11 @@ documentation:
   tasks: docs/07-delivery/07-04-optimization-implementation-status.md
   figma: https://www.figma.com/board/dF7TcDtCd3J96E0Bb0F5Ad
 implementation_sync:
-  date: 2026-08-07
-  workflow_version: 0.7.0
-  figma_node: "12:364"
-  figma_diagram_first_node: "10:305"
-  figma_diagram_last_node: "10:385"
+  date: 2026-08-08
+  workflow_version: 0.8.0
+  figma_node: "15:364"
+  figma_diagram_first_node: "16:366"
+  figma_diagram_last_node: "17:436"
   figma_sync_status: complete
   figma_screenshot_verified: true
   evidence:
@@ -527,5 +536,9 @@ implementation_sync:
     - tests/modules/collection/test_web_discovery.py
     - tests/modules/agent_runtime/test_goal_plan_coverage.py
     - tests/api/test_agent_complex_turns.py
+    - tests/modules/agent_assets/test_agent_assets_product.py
     - tests/modules/agent_runtime/test_context.py
+    - apps/web/e2e/models.spec.ts
+    - apps/web/e2e/agent-assets.spec.ts
+    - apps/web/e2e/runs.spec.ts
     - tests/evals/agent/test_release_eval_harness.py

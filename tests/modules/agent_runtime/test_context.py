@@ -168,3 +168,46 @@ def test_context_snapshot_includes_bounded_working_memory_layer(client) -> None:
     )
     assert memory_layer.version == "context-budget@1.0.0"
     assert memory_layer.content is None
+
+
+def test_context_selects_enabled_workspace_rules_and_domain_skills(
+    client,
+) -> None:
+    with client.app.state.session_factory() as session:
+        executor = build_capability_executor(
+            session,
+            client.app.state.settings,
+        )
+        snapshot = ContextAssembler(
+            executor,
+            workspace_rules="默认中文输出，并说明证据边界。",
+            workspace_skills=[
+                {
+                    "id": "research",
+                    "name": "研究",
+                    "enabled": True,
+                    "domains": ["intelligence"],
+                    "instructions": "先检索，再综合。",
+                },
+                {
+                    "id": "cards",
+                    "name": "卡片",
+                    "enabled": True,
+                    "domains": ["cards"],
+                    "instructions": "生成卡片。",
+                },
+            ],
+        ).assemble(
+            selected_domain_ids=["intelligence"],
+            message="分析趋势",
+            step=None,
+            evidence=[],
+        )
+
+    assert "默认中文输出" in snapshot.system_prompt
+    assert "先检索，再综合" in snapshot.system_prompt
+    assert "生成卡片" not in snapshot.system_prompt
+    assert any(
+        layer.name == "workspace-rules-skills"
+        for layer in snapshot.trace_layers
+    )

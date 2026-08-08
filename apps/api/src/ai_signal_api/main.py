@@ -192,6 +192,7 @@ def create_app(
         default_model = (
             model_configuration.select_for_request(None).effective_model
         )
+        search_model = model_configuration.select_for_search()
         return {
             "status": "ok",
             "workflow_version": WORKFLOW_VERSION,
@@ -205,10 +206,24 @@ def create_app(
                     "model": default_model.model_id,
                 },
                 "search": {
-                    "configured": runtime_settings.search_api_key is not None
-                    and bool(
-                        runtime_settings.search_api_key.get_secret_value().strip()
-                    )
+                    "configured": (
+                        search_model is not None
+                        or (
+                            runtime_settings.search_api_key is not None
+                            and bool(
+                                runtime_settings.search_api_key
+                                .get_secret_value()
+                                .strip()
+                            )
+                        )
+                    ),
+                    "provider": (
+                        f"model:{search_model.id}"
+                        if search_model is not None
+                        else runtime_settings.search_provider
+                        if runtime_settings.search_api_key is not None
+                        else None
+                    ),
                 },
                 "github": {
                     "configured": runtime_settings.github_token is not None

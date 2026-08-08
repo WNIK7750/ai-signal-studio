@@ -71,6 +71,7 @@ def test_provider_key_is_file_managed_and_never_returned(
             "base_url": "https://api.example.com/v1",
             "protocol": "openai_compatible",
             "has_api_key": True,
+            "model_names": ["视觉模型"],
         }
     ]
 
@@ -179,6 +180,43 @@ def test_existing_provider_can_reuse_its_key_for_another_model(
     assert second["provider_id"] == first["provider_id"]
     assert second["has_api_key"] is True
     assert second["base_url"] == "https://api.example.com/v1"
+    provider = client.get("/api/providers").json()[0]
+    assert provider["model_names"] == ["视觉模型", "文本模型"]
+
+
+def test_external_model_can_be_selected_as_the_only_search_model(
+    client: TestClient,
+) -> None:
+    first = create_vision_model(client)
+    second = client.post(
+        "/api/models",
+        json={
+            "name": "联网检索模型",
+            "model_id": "search-model-v1",
+            "provider_id": first["provider_id"],
+        },
+    ).json()
+
+    response = client.post(f"/api/models/{second['id']}/activate-search")
+
+    assert response.status_code == 200
+    assert response.json()["is_search_model"] is True
+    models = client.get("/api/models").json()
+    assert sum(model["is_search_model"] for model in models) == 1
+    selected = client.app.state.model_configuration.select_for_search()
+    assert selected is not None
+    assert selected.id == second["id"]
+
+
+def test_local_rules_model_cannot_be_selected_for_web_search(
+    client: TestClient,
+) -> None:
+    response = client.post("/api/models/model_local/activate-search")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "MODEL-009（当前模型不支持原生联网搜索）"
+    )
 
 
 def test_different_providers_keep_different_keys(

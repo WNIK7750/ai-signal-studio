@@ -136,7 +136,7 @@ class BoundActionChatModel(BaseChatModel):
 
 
 class WorkspaceGraphRunner:
-    """The executable 0.7.0 graph for bounded, goal-covered turns."""
+    """The executable 0.8.0 graph for bounded, goal-covered turns."""
 
     def __init__(
         self,
@@ -147,11 +147,17 @@ class WorkspaceGraphRunner:
         checkpointer: BaseCheckpointSaver,
         event_sink: EventSink | None = None,
         cancellation_checker: Callable[[str], bool] | None = None,
+        workspace_rules: str = "",
+        workspace_skills: list[dict[str, Any]] | None = None,
     ) -> None:
         self.executor = executor
         self.planner_model = planner_model
         self.synthesis_model = synthesis_model or planner_model
-        self.context = ContextAssembler(executor)
+        self.context = ContextAssembler(
+            executor,
+            workspace_rules=workspace_rules,
+            workspace_skills=workspace_skills,
+        )
         self.event_sink = event_sink or (lambda *_args: None)
         self.cancellation_checker = cancellation_checker or (
             lambda _turn_id: False

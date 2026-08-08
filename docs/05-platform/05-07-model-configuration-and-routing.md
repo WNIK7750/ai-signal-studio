@@ -10,6 +10,8 @@
 - Provider 保存 API 地址和密钥引用，多个模型可以复用同一个 Provider；
 - 新建外部模型必须填写 API Key，或选择一个已经配置密钥的 Provider；不允许保存必然不可调用的空配置；
 - 模型保存显示名称、模型 ID、能力声明和最大输出额度；
+- 外部模型可被显式设为唯一“搜索模型”，通过 OpenAI 兼容 Responses
+  `web_search` 补充网页来源；未选择时保留环境搜索 API 作为备用；
 - API Key 写入独立的本地密钥文件，不写数据库、不进入模型文件、不返回前端；
 - 当前支持 `heuristic` 与 `openai_compatible` 两类 Provider。
 
@@ -74,6 +76,7 @@
 | `output_token_limit` | 实际传给 Provider 的最大输出 Token；空值表示使用运行时默认 |
 | `enabled` | 是否可用于选择 |
 | `is_default` | 是否为工作区默认模型 |
+| `is_search_model` | 是否承担原生联网搜索；同一工作区最多一个 |
 
 同一工作区始终最多只有一个默认模型。创建首个模型时自动设为默认；显式切换时在一个事务中清除旧默认并设置新默认。
 
@@ -86,6 +89,7 @@ POST /api/models
 PATCH /api/models/{model_id}
 DELETE /api/models/{model_id}
 POST /api/models/{model_id}/activate
+POST /api/models/{model_id}/activate-search
 POST /api/models/{model_id}/test
 POST /api/agent-runs
 ```
@@ -116,6 +120,7 @@ POST /api/agent-runs
 | `MODEL-006` | 模型返回内容无效 |
 | `MODEL-007` | 内置模型不可修改 |
 | `MODEL-008` | 内置模型无需连接测试 |
+| `MODEL-009` | 当前模型不支持原生联网搜索 |
 | `PROVIDER-001` | 未找到指定提供商 |
 | `PROVIDER-002` | 提供商配置不完整 |
 | `PROVIDER-003` | 接口地址或模型 ID 不可用 |
@@ -145,6 +150,7 @@ POST /api/agent-runs
 - 删除使用二次确认和软删除；被删模型从设置及对话选择中消失，Provider 与密钥继续保留；
 - 删除当前默认模型后回退到仍可用模型；内置本地模型不可编辑或删除；
 - 可以为不同 Provider 保存不同密钥，也可以让多个模型复用一个 Provider；
+- 已保存 Provider 在选择器中列出全部复用模型名称；外部模型可设为搜索模型；
 - 模型与 Provider API 只返回 `has_api_key`，不返回密钥、掩码或末尾字符；
 - 直接编辑本地模型文件后，下一次请求可以读取新配置；
 - 设置页切换默认模型后只有一个 `is_default=true`；

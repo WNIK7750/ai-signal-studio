@@ -22,7 +22,7 @@ def _service(request: Request) -> ModelConfigurationService:
 def _error_status(error: ModelConfigurationError) -> int:
     if error.code == "MODEL-001":
         return status.HTTP_404_NOT_FOUND
-    if error.code in {"MODEL-004", "MODEL-007"}:
+    if error.code in {"MODEL-004", "MODEL-007", "MODEL-009"}:
         return status.HTTP_409_CONFLICT
     if error.code == "SECRET-004":
         return status.HTTP_401_UNAUTHORIZED
@@ -118,6 +118,24 @@ def activate_model(
 ) -> ModelConfigRead:
     try:
         model = _service(request).activate_model(model_id)
+    except ModelConfigurationError as error:
+        raise HTTPException(
+            status_code=_error_status(error),
+            detail=str(error),
+        ) from error
+    return ModelConfigRead.model_validate(model)
+
+
+@router.post(
+    "/models/{model_id}/activate-search",
+    response_model=ModelConfigRead,
+)
+def activate_search_model(
+    model_id: str,
+    request: Request,
+) -> ModelConfigRead:
+    try:
+        model = _service(request).activate_search_model(model_id)
     except ModelConfigurationError as error:
         raise HTTPException(
             status_code=_error_status(error),

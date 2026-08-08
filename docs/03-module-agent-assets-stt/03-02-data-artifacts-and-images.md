@@ -31,6 +31,10 @@ class ArtifactRef(BaseModel):
     created_at: datetime
 ```
 
+Artifact 列表按“全部、生成内容、图片、文档”切换视图，并显示来源标题、来源时间与
+可用的原始链接。生成卡片在 Artifact metadata 中保留卡片来源；本地上传明确标记为
+“本地上传”，不伪造外部链接。
+
 实时语音流不作为普通 Artifact 自动保存。只有用户明确选择“保留录音”时才另行设计，第一版不实现。
 
 ## 3. 文档导入

@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-WORKFLOW_VERSION = "0.7.0"
+WORKFLOW_VERSION = "0.8.0"
 
 
 TurnStatus = Literal[
@@ -383,6 +383,7 @@ class ExecutionManifest(BaseModel):
     model_config_ref: str
     capability_snapshot_digest: str
     artifact_ids: list[str] = Field(default_factory=list, max_length=20)
+    agent_pack_version: str = "built-in-defaults"
 
 
 class AgentTurnResult(BaseModel):

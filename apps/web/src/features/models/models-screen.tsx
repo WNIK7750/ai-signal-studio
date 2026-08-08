@@ -13,6 +13,7 @@ import {
   IconPlus,
   IconServer,
   IconTrash,
+  IconWorldSearch,
   IconX,
 } from "@tabler/icons-react";
 import Link from "next/link";
@@ -194,6 +195,19 @@ export function ModelsScreen() {
           : "SYS-001（切换模型失败）",
       ),
   });
+  const activateSearchModel = useMutation({
+    mutationFn: api.activateSearchModel,
+    onSuccess: () => {
+      setError("");
+      void queryClient.invalidateQueries({ queryKey: ["models"] });
+    },
+    onError: (reason) =>
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "SYS-001（设置搜索模型失败）",
+      ),
+  });
   function changeProvider(nextId: string) {
     const preset = findProviderPreset(nextId);
     const provider = providers.data?.find((item) => item.id === nextId);
@@ -274,6 +288,13 @@ export function ModelsScreen() {
             密钥保存在本地独立文件中，保存后不再回显；同一提供商可供多个模型复用。
           </span>
         </div>
+        <div className="credential-note model-search-note">
+          <IconWorldSearch size={18} />
+          <span>
+            搜索模型通过 OpenAI 兼容 Responses 的联网能力补充网页来源；
+            不支持时会返回可定位错误，搜索 API 可继续作为备用。
+          </span>
+        </div>
         {error && !formMode && !deleteTarget && (
           <p className="inline-error" role="alert">{error}</p>
         )}
@@ -302,6 +323,11 @@ export function ModelsScreen() {
                   )}
                   {model.has_api_key && (
                     <span className="model-capability-tag">密钥已配置</span>
+                  )}
+                  {model.is_search_model && (
+                    <span className="model-capability-tag success">
+                      搜索模型
+                    </span>
                   )}
                   {model.provider !== "heuristic" && !model.has_api_key && (
                     <span className="model-capability-tag warning">
@@ -357,6 +383,21 @@ export function ModelsScreen() {
                 )}
                 {model.provider !== "heuristic" && (
                   <>
+                    {model.is_search_model ? (
+                      <span className="model-search-role">
+                        <IconWorldSearch size={15} /> 当前搜索
+                      </span>
+                    ) : (
+                      <button
+                        className="secondary-button compact-button"
+                        onClick={() => activateSearchModel.mutate(model.id)}
+                        disabled={activateSearchModel.isPending}
+                        title="使用该模型的原生联网搜索能力"
+                      >
+                        <IconWorldSearch size={16} />
+                        设为搜索
+                      </button>
+                    )}
                     <button
                       className="icon-button"
                       onClick={() => testModel.mutate(model.id)}
@@ -441,6 +482,9 @@ export function ModelsScreen() {
                         <option key={provider.id} value={provider.id}>
                           {provider.name}
                           {provider.has_api_key ? "（密钥已配置）" : ""}
+                          {provider.model_names.length
+                            ? `（${provider.model_names.join("）（")}）`
+                            : ""}
                         </option>
                       ))}
                     </optgroup>

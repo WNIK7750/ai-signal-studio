@@ -49,6 +49,7 @@ class ArtifactService:
         filename: str,
         media_type: str,
         content_base64: str,
+        metadata: dict[str, object] | None = None,
     ) -> ArtifactModel:
         if PurePath(filename).name != filename or not filename.strip():
             raise ArtifactError("ARTIFACT_FILENAME_INVALID")
@@ -80,7 +81,11 @@ class ArtifactService:
             sha256=digest,
             size_bytes=len(content),
             extracted_text=extracted_text[:200_000],
-            metadata_json={"parser": "native-v1"},
+            metadata_json={
+                "parser": "native-v1",
+                "source_title": "本地上传",
+                **(metadata or {}),
+            },
         )
         self.session.add(artifact)
         self.session.flush()

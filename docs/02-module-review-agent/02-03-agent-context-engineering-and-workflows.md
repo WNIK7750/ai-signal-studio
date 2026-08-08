@@ -1149,3 +1149,22 @@ collection.run.start
 错误堆栈不会反复进入模型，只保留安全错误码、首行摘要和 retryable 状态；原始诊断仍
 留在运行记录中供用户查看。对 OpenAI 与阿里云等兼容端点，运行时继续使用服务端工具
 绑定，不依赖 Provider 特有的 logits mask 或原生 compaction，保持可移植性。
+
+### 16.6 0.8.0 Rules / Skills 与搜索模型选择
+
+Context Contract 升级为 `1.4.0`，不改变 N01～N25 主拓扑：
+
+- Active Agent Pack 的 `rules_path` 保存工作区级规则；它在每轮进入有界 Base
+  Context，适合定义默认语言、证据边界、安全动作和输出习惯；
+- `skill_paths` 保存可独立启停的 Skill。每项包含稳定 ID、名称、说明、适用 Domain
+  与可执行指令；N04 只选择与本轮 Domain 匹配的启用项，最多装配 4 项；
+- Rules / Skills 的每次保存都会生成新的不可变 Agent Pack 版本，旧版本可恢复；旧 Pack
+  未声明这些字段时读取三项默认 Skill，保证 Agent 仍具备证据优先、中文清晰输出和
+  高风险动作确认能力；
+- Turn Manifest 固定记录实际使用的 `agent_pack_version`，使运行记录可以解释当时的
+  Context，而不是受后来编辑影响；
+- 模型页可以把一个已配置的外部模型设为唯一“搜索模型”。联网补证先调用
+  OpenAI-compatible Responses `web_search`，只接受可追溯 URL 引用；若配置了传统
+  Search API，则作为后备 Provider。模型文字但无 URL 引用不进入证据集；
+- 运行记录与 Artifact 的顶部分类只切换同一数据集，不改变事实归属；未知 Capability
+  自动进入“其他”，避免新增能力时修改固定枚举。

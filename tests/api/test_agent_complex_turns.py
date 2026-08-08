@@ -4,6 +4,8 @@ import json
 
 from fastapi.testclient import TestClient
 
+from ai_signal_api.modules.agent_assets.agent_packs import AgentPackService
+
 
 COLLECT_PROMPT = (
     "你好，请你帮我收集最近24小时的热点AI内容，并选出其中影响力最大的三个，给我分析总结"
@@ -34,7 +36,7 @@ def _create(
         f"/api/agent-turns/{response.json()['id']}"
     ).json()
     assert turn["status"] in {"complete", "partial"}, turn
-    assert turn["workflow_version"] == "0.7.0"
+    assert turn["workflow_version"] == "0.8.0"
     assert turn["requested_model_id"] == model_id
     assert turn["effective_model_id"] == model_id
     return turn
@@ -109,6 +111,32 @@ def _assert_complex_result(
         set(finding["information_ids"]).issubset(selected_ids)
         for finding in trend["key_findings"]
     )
+
+
+def test_agent_falls_back_to_builtin_context_when_agent_pack_is_unavailable(
+    client: TestClient,
+    tmp_path,
+) -> None:
+    with client.app.state.session_factory() as session:
+        active = AgentPackService(
+            session,
+            client.app.state.settings.agent_pack_root,
+        ).get_active("ai-editor")
+        active.storage_uri = str(tmp_path / "unavailable-pack")
+        session.commit()
+
+    conversation = client.post("/api/agent-conversations", json={}).json()
+    turn = _create(
+        client,
+        conversation["id"],
+        COLLECT_PROMPT,
+        "agent-pack-fallback",
+    )
+
+    assert turn["manifest"]["agent_pack_version"] == "built-in-defaults"
+    events = client.get(f"/api/agent-turns/{turn['id']}/events")
+    assert "context.customization.fallback" in events.text
+    assert "AGENT_PACK_UNAVAILABLE" in events.text
 
 
 def test_original_prompts_run_through_one_turn_runtime_and_share_context(

@@ -16,7 +16,8 @@
     "supports_vision",
     "output_token_limit",
     "enabled",
-    "is_default"
+    "is_default",
+    "is_search_model"
   ],
   "properties": {
     "id": {
@@ -63,6 +64,9 @@
       "type": "boolean"
     },
     "is_default": {
+      "type": "boolean"
+    },
+    "is_search_model": {
       "type": "boolean"
     }
   }

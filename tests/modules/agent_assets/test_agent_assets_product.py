@@ -8,7 +8,10 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi.testclient import TestClient
 
-from ai_signal_api.modules.agent_assets.agent_packs import AgentPackService
+from ai_signal_api.modules.agent_assets.agent_packs import (
+    AgentPackService,
+    seed_default_agent_pack,
+)
 
 
 def _pack_zip(*, version: str = "1.0.0", unsafe: bool = False) -> str:
@@ -139,6 +142,125 @@ def test_agent_pack_import_preserves_a_conflicting_immutable_directory(
     )
 
 
+def test_rules_and_skills_are_versioned_in_the_agent_pack(
+    client: TestClient,
+) -> None:
+    client.post(
+        "/api/agent-packs/import",
+        json={"zip_base64": _pack_zip(), "activate": True},
+    )
+    defaults = client.get(
+        "/api/agent-packs/ai-editor/customization"
+    ).json()
+    assert defaults["rules"]
+    assert len(defaults["skills"]) >= 3
+
+    saved = client.put(
+        "/api/agent-packs/ai-editor/customization",
+        json={
+            "version": "1.1.0",
+            "rules": "# 我的规则\n\n默认中文输出。",
+            "skills": [
+                {
+                    "id": "my-style",
+                    "name": "我的输出风格",
+                    "description": "自定义格式",
+                    "enabled": True,
+                    "domains": ["intelligence"],
+                    "instructions": "先给结论，再给编号证据。",
+                }
+            ],
+        },
+    )
+
+    assert saved.status_code == 200
+    assert saved.json()["version"] == "1.1.0"
+    current = client.get(
+        "/api/agent-packs/ai-editor/customization"
+    ).json()
+    assert current["rules"].startswith("# 我的规则")
+    assert current["skills"][0]["id"] == "my-style"
+
+    duplicate = client.put(
+        "/api/agent-packs/ai-editor/customization",
+        json={
+            "version": "1.2.0",
+            "rules": "# 重复 ID",
+            "skills": [
+                {
+                    "id": "same-skill",
+                    "name": "一",
+                    "enabled": True,
+                    "domains": ["*"],
+                    "instructions": "第一条。",
+                },
+                {
+                    "id": "same-skill",
+                    "name": "二",
+                    "enabled": True,
+                    "domains": ["*"],
+                    "instructions": "第二条。",
+                },
+            ],
+        },
+    )
+    assert duplicate.status_code == 422
+    assert duplicate.json()["detail"] == "AGENT_PACK_SKILL_ID_DUPLICATE"
+
+
+def test_default_agent_pack_upgrade_and_storage_repair_are_automatic(
+    client: TestClient,
+    tmp_path: Path,
+) -> None:
+    root = client.app.state.settings.agent_pack_root
+    with client.app.state.session_factory() as session:
+        service = AgentPackService(session, root)
+        legacy = service.import_base64(
+            _pack_zip(version="0.1.0"),
+            imported_by="system-default",
+        )
+        assert legacy.status == "active"
+
+        seed_default_agent_pack(session, root)
+        upgraded = service.get_active("ai-editor")
+        assert upgraded.version == "0.2.0"
+
+        upgraded.storage_uri = str(tmp_path / "missing-agent-pack")
+        session.commit()
+
+    unavailable = client.get(
+        "/api/agent-packs/ai-editor/customization"
+    )
+    assert unavailable.status_code == 422
+    assert unavailable.json()["detail"] == "AGENT_PACK_MANIFEST_MISSING"
+
+    with client.app.state.session_factory() as session:
+        seed_default_agent_pack(session, root)
+        repaired = AgentPackService(session, root).get_active("ai-editor")
+        assert repaired.validation_result["repaired"] is True
+        assert (Path(repaired.storage_uri) / "agent.yaml").is_file()
+
+
+def test_default_seed_never_overwrites_a_user_pack(
+    client: TestClient,
+) -> None:
+    root = client.app.state.settings.agent_pack_root
+    with client.app.state.session_factory() as session:
+        service = AgentPackService(session, root)
+        custom = service.import_base64(
+            _pack_zip(version="9.0.0"),
+            imported_by="local",
+        )
+        custom_id = custom.id
+        seed_default_agent_pack(session, root)
+        active = service.get_active("ai-editor")
+        active_id = active.id
+        active_version = active.version
+
+    assert active_id == custom_id
+    assert active_version == "9.0.0"
+
+
 def test_artifact_upload_deduplicates_and_returns_a_reference(
     client: TestClient,
 ) -> None:
@@ -157,6 +279,9 @@ def test_artifact_upload_deduplicates_and_returns_a_reference(
     assert artifact["artifact_id"] == duplicate.json()["artifact_id"]
     assert artifact["size_bytes"] == len(content)
     assert artifact["sha256"]
+    assert artifact["source_title"] == "本地上传"
+    assert artifact["source_url"] is None
+    assert artifact["source_time"]
     detail = client.get(f"/api/artifacts/{artifact['artifact_id']}").json()
     assert "仅使用官方资料" in detail["extracted_text"]
     assert "content_base64" not in json.dumps(detail)

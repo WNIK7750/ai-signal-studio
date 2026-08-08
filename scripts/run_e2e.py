@@ -48,6 +48,8 @@ def main() -> int:
         model_secrets_path = (
             Path(temp) / "model-secrets.local.json"
         ).as_posix()
+        agent_pack_root = (Path(temp) / "agent-packs").as_posix()
+        artifact_root = (Path(temp) / "artifacts").as_posix()
         env = os.environ.copy()
         env.update(
             {
@@ -59,6 +61,8 @@ def main() -> int:
                 "AI_SIGNAL_SOURCE_SEED_MODE": "demo",
                 "AI_SIGNAL_MODEL_CONFIG_PATH": model_config_path,
                 "AI_SIGNAL_MODEL_SECRETS_PATH": model_secrets_path,
+                "AI_SIGNAL_AGENT_PACK_ROOT": agent_pack_root,
+                "AI_SIGNAL_ARTIFACT_ROOT": artifact_root,
                 "AI_SIGNAL_CORS_ORIGINS": '["http://127.0.0.1:3010"]',
                 "NEXT_PUBLIC_API_BASE_URL": "http://127.0.0.1:8010/api",
                 "NEXT_DIST_DIR": ".next-e2e",

@@ -33,6 +33,12 @@ from ai_signal_api.agent_runtime.contracts import (
     WORKFLOW_VERSION,
 )
 from ai_signal_api.agent_runtime.graph import WorkspaceGraphRunner
+from ai_signal_api.modules.agent_assets.agent_packs import (
+    DEFAULT_RULES,
+    DEFAULT_SKILLS,
+    AgentPackError,
+    AgentPackService,
+)
 from ai_signal_api.capabilities.registry import build_capability_executor
 from ai_signal_api.config import Settings
 from ai_signal_api.integrations.llm.compatibility import (
@@ -1168,6 +1174,26 @@ def process_turn(
                 "models": "1.0.0",
                 "agent": "1.0.0",
             }
+            try:
+                customization = AgentPackService(
+                    session,
+                    settings.agent_pack_root,
+                ).get_customization("ai-editor")
+            except (AgentPackError, LookupError, OSError, UnicodeError) as error:
+                customization = {
+                    "version": "built-in-defaults",
+                    "rules": DEFAULT_RULES,
+                    "skills": DEFAULT_SKILLS,
+                }
+                journal.append(
+                    "context.customization.fallback",
+                    {
+                        "status": "degraded",
+                        "error_code": "AGENT_PACK_UNAVAILABLE",
+                        "error_type": type(error).__name__,
+                    },
+                )
+            manifest["agent_pack_version"] = customization["version"]
             turn.manifest = manifest
             runner = WorkspaceGraphRunner(
                 executor=executor,
@@ -1178,6 +1204,8 @@ def process_turn(
                     session_factory,
                     candidate_turn_id,
                 ),
+                workspace_rules=str(customization["rules"]),
+                workspace_skills=list(customization["skills"]),
             )
             state = (
                 runner.resume(

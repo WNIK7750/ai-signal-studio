@@ -209,8 +209,16 @@ def _reference_only(value: Any) -> Any:
 class ContextAssembler:
     """Builds a bounded Base + selected Domain + Step context snapshot."""
 
-    def __init__(self, executor: CapabilityExecutor) -> None:
+    def __init__(
+        self,
+        executor: CapabilityExecutor,
+        *,
+        workspace_rules: str = "",
+        workspace_skills: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.executor = executor
+        self.workspace_rules = workspace_rules.strip()
+        self.workspace_skills = workspace_skills or []
 
     def assemble(
         self,
@@ -237,6 +245,39 @@ class ContextAssembler:
             prompt_parts.append(
                 (domain_root / "prompt.md").read_text(encoding="utf-8")
             )
+        selected_skills = [
+            skill
+            for skill in self.workspace_skills
+            if (
+                skill.get("enabled", True)
+                and (
+                    "*" in skill.get("domains", [])
+                    or set(selected_domain_ids).intersection(
+                        skill.get("domains", [])
+                    )
+                )
+            )
+        ][:4]
+        workspace_context = ""
+        if self.workspace_rules or selected_skills:
+            workspace_context = "\n\n".join(
+                [
+                    (
+                        "用户确认的工作区 Rules：\n"
+                        f"{self.workspace_rules[:16000]}"
+                    )
+                    if self.workspace_rules
+                    else "",
+                    *[
+                        (
+                            f"已启用 Skill · {skill.get('name', skill.get('id'))}：\n"
+                            f"{str(skill.get('instructions', ''))[:8000]}"
+                        )
+                        for skill in selected_skills
+                    ],
+                ]
+            ).strip()
+            prompt_parts.append(workspace_context)
         available = set(self.executor.registry.ids()).difference(
             self.executor.disabled_capabilities
         )
@@ -298,6 +339,14 @@ class ContextAssembler:
             )
             for index, domain_id in enumerate(selected_domain_ids)
         )
+        if workspace_context:
+            layers.append(
+                self._trace(
+                    "workspace-rules-skills",
+                    "agent-pack-customization@1",
+                    workspace_context,
+                )
+            )
         if working_memory_text:
             layers.append(
                 self._trace(

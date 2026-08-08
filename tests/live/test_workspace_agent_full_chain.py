@@ -85,7 +85,7 @@ def test_workspace_agent_real_model_full_chain(tmp_path: Path) -> None:
             turn = response.json()
 
         assert turn["status"] == "complete", turn
-        assert turn["workflow_version"] == "0.7.0"
+        assert turn["workflow_version"] == "0.8.0"
         assert turn["requested_model_id"] == selected_model_id
         assert turn["effective_model_id"] == selected_model_id
         assert turn["total_duration_ms"] >= 0

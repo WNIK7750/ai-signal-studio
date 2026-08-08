@@ -643,7 +643,7 @@ export function AgentScreen() {
       client_message_id: clientMessageId,
       status: "queued",
       message: value,
-      workflow_version: "0.5.0",
+      workflow_version: "0.8.0",
       requested_model_id: activeModelId || null,
       effective_model_id: null,
       manifest: {},

@@ -342,7 +342,7 @@ def test_execution_manifest_uses_0_6_schema_versions_and_model_trace() -> None:
         capability_snapshot_digest="digest",
     )
 
-    assert manifest.workflow_version == "0.7.0"
+    assert manifest.workflow_version == "0.8.0"
     assert manifest.state_schema_version == "1.2.0"
     assert manifest.plan_schema_version == "1.2.0"
     assert manifest.event_schema_version == "1.2.0"
